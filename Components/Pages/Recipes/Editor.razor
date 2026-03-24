@@ -1,0 +1,286 @@
+@page "/recipes/create"
+@page "/recipes/edit/{Id:guid}"
+@inject RecipeService RecipeService
+@inject IngredientService IngredientService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<div class="mb-4">
+    <h1>
+        <i class="bi @(Id == null ? "bi-plus-circle-fill" : "bi-pencil-square") me-2"></i>
+        @(Id == null ? "Adaugă Rețetă Nouă" : $"Editare Rețetă: {recipeName}")
+    </h1>
+    <p class="text-muted">Configurează ingredientele și gramajele pentru o singură porție.</p>
+</div>
+
+@if (loading)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Se încarcă...</span>
+        </div>
+        <p class="mt-2 text-muted">Se încarcă detaliile rețetei...</p>
+    </div>
+}
+else
+{
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 mb-4 h-100">
+                <div class="card-header bg-brown text-white py-3">
+                    <h5 class="mb-0 fw-bold">1. Detalii Generale</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Nume Rețetă (ex: Pui cu Orez și Vitamine)</label>
+                        <input type="text" class="form-control" @bind="recipeName" placeholder="Nume rețetă..." />
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Preț Ideal per Porție (Lei)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" @bind="idealPrice" step="0.5" />
+                            <span class="input-group-text">Lei</span>
+                        </div>
+                        <small class="text-muted">Prețul la care dorești să vinzi o porție.</small>
+                    </div>
+
+                    <hr />
+
+                    <h5 class="mt-4 mb-3 fw-bold">2. Ingrediente Rețetă</h5>
+                    
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th style="width: 40%;">Ingredient</th>
+                                    <th class="text-center" style="width: 20%;">Cantitate (Grame)</th>
+                                    <th class="text-end" style="width: 25%;">Preț Recomandat / Gramaj</th>
+                                    <th class="text-center" style="width: 15%;">Acțiuni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ri in selectedIngredients)
+                                {
+                                    var recommendedPricePerGram = IngredientService.CalculateRecommendedPricePerKg(ri.Ingredient!) / 1000m;
+                                    var rowRecommendedPrice = recommendedPricePerGram * ri.QuantityGrams;
+
+                                    <tr>
+                                        <td>
+                                            <div class="fw-bold">@ri.Ingredient!.Name</div>
+                                            <small class="text-muted">(@GetCategoryLabel(ri.Ingredient!.Category))</small>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="input-group input-group-sm">
+                                                <input type="number" class="form-control text-center" 
+                                                       @bind="ri.QuantityGrams" @bind:event="oninput" min="1" />
+                                                <span class="input-group-text">g</span>
+                                            </div>
+                                        </td>
+                                        <td class="text-end">
+                                            <span class="text-success fw-bold">@rowRecommendedPrice.ToString("N3") Lei</span>
+                                        </td>
+                                        <td class="text-center">
+                                            <button class="btn btn-sm btn-outline-danger border-0" @onclick="() => RemoveIngredient(ri)">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-4 p-4 rounded-4 shadow-sm position-relative" style="background-color: #fff9c430; border: 2px dashed #ffe082;">
+                        <h6 class="fw-bold mb-3 text-brown"><i class="bi bi-search me-2"></i>Caută și Adaugă Ingredient</h6>
+                        <div class="position-relative">
+                            <div class="input-group">
+                                <span class="input-group-text bg-white border-primary border-end-0 border-2">
+                                    <i class="bi bi-search text-primary shadow-sm" style="font-size: 1.2rem;"></i>
+                                </span>
+                                <input type="text" class="form-control border-primary border-start-0 ps-0 border-2 py-3 fw-bold shadow-sm" 
+                                       placeholder="Scrie numele ingredientului aici..." 
+                                       @bind="ingredientSearchTerm" @bind:event="oninput" 
+                                       @onfocus="() => showSearchResults = true" />
+                            </div>
+
+                            @if (showSearchResults && !string.IsNullOrWhiteSpace(ingredientSearchTerm))
+                            {
+                                var results = GetFilteredAvailableIngredients();
+                                @if (results.Any())
+                                {
+                                    <div class="list-group position-absolute w-100 shadow-lg mt-1 rounded-4 overflow-hidden border-2 border-primary" style="z-index: 1050; max-height: 400px; overflow-y: auto;">
+                                        @foreach (var ing in results)
+                                        {
+                                            <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3"
+                                                    @onclick="() => SelectAndAddIngredient(ing)">
+                                                <div>
+                                                    <span class="fw-bold h5 mb-0">@ing.Name</span>
+                                                    <span class="badge @GetCategoryBadgeClass(ing.Category) ms-2">@GetCategoryLabel(ing.Category)</span>
+                                                </div>
+                                                <div class="text-end">
+                                                    <div class="fw-bold text-success">@ing.BasePricePerKg.ToString("N2") Lei/Kg</div>
+                                                    <small class="text-muted text-uppercase">Bază</small>
+                                                </div>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="list-group position-absolute w-100 shadow-lg mt-1 rounded-4 border-2 border-primary bg-white p-4 text-center" style="z-index: 1050;">
+                                        <i class="bi bi-emoji-frown text-muted h3 d-block"></i>
+                                        <span class="text-muted fw-bold">Nu am găsit niciun ingredient cu acest nume...</span>
+                                    </div>
+                                }
+                            }
+                        </div>
+                        <small class="text-muted mt-2 d-block bg-white-50 p-2 rounded-3 border">
+                            <i class="bi bi-info-circle me-1"></i> Tipează numele unui ingredient pentru a-l vedea în listă, apoi dă click pe el pentru a-l adăuga instantaneu în rețetă.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 sticky-top" style="top: 20px;">
+                <div class="card-header bg-accent-orange text-white py-3">
+                    <h5 class="mb-0 fw-bold">3. Sumar Financiar (Porție)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3 d-flex justify-content-between">
+                        <span class="text-muted">Preț Ideal:</span>
+                        <span class="fw-bold">@idealPrice.ToString("N2") Lei</span>
+                    </div>
+                    
+
+
+                    <div class="mb-3 d-flex justify-content-between">
+                        <span class="text-muted">Total Recomandat:</span>
+                        <span class="fw-bold text-primary">@totalRecommended.ToString("N2") Lei</span>
+                    </div>
+
+                    <div class="recipe-financials mt-4 text-center" style="background-color: @(statusColor + "15"); border-color: @statusColor;">
+                        <span class="text-muted small fw-bold text-uppercase d-block mb-1">Diferență Profit</span>
+                        <h2 class="mb-1 fw-bold" style="color: @statusColor;">
+                            @((difference >= 0 ? "+" : ""))@difference.ToString("N2") Lei
+                        </h2>
+                        <div class="fw-bold" style="color: @statusColor;">
+                            @RecipeService.GetDifferenceStatusText(difference)
+                        </div>
+                    </div>
+
+                    <div class="mt-5 d-grid gap-2">
+                        <button class="btn btn-lg btn-primary shadow-sm" @onclick="HandleSave" disabled="@(string.IsNullOrWhiteSpace(recipeName) || !selectedIngredients.Any())">
+                            <i class="bi bi-save me-2"></i> Salvează Rețeta
+                        </button>
+                        <a href="/recipes" class="btn btn-secondary shadow-sm">
+                            Anulează
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    
+    private string recipeName = "";
+    private decimal idealPrice = 0;
+    private List<RecipeIngredient> selectedIngredients = new();
+    private List<Ingredient> availableIngredients = new();
+    private string ingredientSearchTerm = "";
+    private bool showSearchResults = false;
+    private bool loading = true;
+
+    private decimal totalRecommended => selectedIngredients.Sum(ri => (IngredientService.CalculateRecommendedPricePerKg(ri.Ingredient!) / 1000m) * ri.QuantityGrams);
+    private decimal difference => idealPrice - totalRecommended;
+    private string statusColor => RecipeService.GetStatusColor(difference);
+
+    protected override async Task OnInitializedAsync()
+    {
+        availableIngredients = await IngredientService.GetAllIngredientsAsync();
+        
+        if (Id != null)
+        {
+            var recipe = await RecipeService.GetRecipeByIdAsync(Id.Value);
+            if (recipe != null)
+            {
+                recipeName = recipe.Name;
+                idealPrice = recipe.IdealPrice;
+                selectedIngredients = recipe.RecipeIngredients.ToList();
+            }
+        }
+
+        loading = false;
+    }
+
+    private IEnumerable<Ingredient> GetFilteredAvailableIngredients()
+    {
+        var filtered = availableIngredients;
+        if (!string.IsNullOrWhiteSpace(ingredientSearchTerm))
+        {
+            filtered = filtered.Where(i => i.Name.Contains(ingredientSearchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+        
+        // Remove already selected ingredients
+        return filtered.Where(i => !selectedIngredients.Any(si => si.IngredientId == i.Id));
+    }
+
+    private string GetCategoryBadgeClass(IngredientCategory category) => category switch
+    {
+        IngredientCategory.RawFood => "bg-info text-dark",
+        IngredientCategory.CookedFood => "bg-warning text-dark",
+        IngredientCategory.Vitamins => "bg-success text-white",
+        _ => "bg-secondary"
+    };
+
+    private void SelectAndAddIngredient(Ingredient ingredient)
+    {
+        if (!selectedIngredients.Any(ri => ri.IngredientId == ingredient.Id))
+        {
+            selectedIngredients.Add(new RecipeIngredient 
+            { 
+                IngredientId = ingredient.Id, 
+                Ingredient = ingredient,
+                QuantityGrams = 100 
+            });
+            ingredientSearchTerm = "";
+            showSearchResults = false;
+        }
+    }
+
+    private void RemoveIngredient(RecipeIngredient ri)
+    {
+        selectedIngredients.Remove(ri);
+    }
+
+    private async Task HandleSave()
+    {
+        var recipe = new Recipe
+        {
+            Id = Id ?? Guid.NewGuid(),
+            Name = recipeName,
+            IdealPrice = idealPrice,
+            RecipeIngredients = selectedIngredients.Select(si => new RecipeIngredient 
+            { 
+                IngredientId = si.IngredientId, 
+                QuantityGrams = si.QuantityGrams,
+                RecipeId = Id ?? Guid.Empty 
+            }).ToList()
+        };
+
+        await RecipeService.SaveRecipeAsync(recipe);
+        NavigationManager.NavigateTo("/recipes");
+    }
+
+    private string GetCategoryLabel(IngredientCategory category) => category switch
+    {
+        IngredientCategory.RawFood => "Crude",
+        IngredientCategory.CookedFood => "Gătite",
+        IngredientCategory.Vitamins => "Vitamine",
+        _ => category.ToString()
+    };
+}

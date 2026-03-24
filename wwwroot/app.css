@@ -1,0 +1,150 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&family=Poppins:wght@400;500;600&display=swap');
+
+:root {
+    --bg-color: #FAF6F0;
+    --accent-orange: #FF8D29;
+    --accent-brown: #7D5A50;
+    --accent-yellow: #FFF9C4;
+    --text-color: #3E2723;
+    --card-shadow: 0 4px 15px rgba(0,0,0,0.06);
+    --border-radius: 16px;
+}
+
+html, body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: 'Poppins', 'Nunito', sans-serif;
+    min-height: 100vh;
+}
+
+a, .btn-link {
+    color: var(--accent-orange);
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+a:hover {
+    color: #e67e22;
+}
+
+.btn-primary {
+    background-color: var(--accent-orange);
+    border-color: var(--accent-orange);
+    border-radius: 10px;
+    padding: 10px 24px;
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(255, 141, 41, 0.2);
+}
+
+.btn-primary:hover {
+    background-color: #e67e22;
+    border-color: #e67e22;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background-color: #fff;
+    color: var(--accent-brown);
+    border: 2px solid var(--accent-brown);
+    border-radius: 10px;
+    padding: 8px 22px;
+    font-weight: 600;
+}
+
+.btn-secondary:hover {
+    background-color: var(--accent-brown);
+    color: #fff;
+}
+
+.card {
+    border-radius: var(--border-radius);
+    border: 1px solid rgba(0,0,0,0.02);
+    box-shadow: var(--card-shadow);
+    background-color: #ffffff;
+    padding: 24px;
+    margin-bottom: 24px;
+}
+
+.nav-menu {
+    background-color: var(--accent-brown);
+}
+
+.navbar-brand {
+    font-weight: 700;
+    color: var(--accent-yellow) !important;
+}
+
+.sidebar {
+    background-color: var(--accent-brown) !important;
+}
+
+.nav-item a {
+    color: #efebe9 !important;
+    border-radius: 8px;
+    margin: 4px 8px;
+}
+
+.nav-item a:hover, .nav-item a.active {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: var(--accent-yellow) !important;
+}
+
+.table {
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    background-color: #fff;
+    box-shadow: var(--card-shadow);
+}
+
+.table th {
+    background-color: var(--accent-brown);
+    color: #fff;
+    font-weight: 500;
+    border: none;
+}
+
+.table td {
+    border-color: #f1f1f1;
+    vertical-align: middle;
+}
+
+h1, h2, h3, h4 {
+    font-weight: 600;
+    color: var(--accent-brown);
+}
+
+.status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+/* Custom styles for the "Cute Pet Kitchen" */
+.form-control, .form-select {
+    border-radius: 10px;
+    border: 2px solid #efebe9;
+    padding: 10px 15px;
+}
+
+.form-control:focus {
+    border-color: var(--accent-orange);
+    box-shadow: 0 0 0 0.2rem rgba(255, 141, 41, 0.15);
+}
+
+.recipe-financials {
+    background-color: var(--accent-yellow);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 2px dashed var(--accent-orange);
+}
+
+.ingredient-row {
+    transition: background-color 0.2s;
+}
+
+.ingredient-row:hover {
+    background-color: #fafafa;
+}

@@ -1,0 +1,168 @@
+@page "/ingredients/create"
+@page "/ingredients/edit/{Id:guid}"
+@inject IngredientService IngredientService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<div class="mb-4">
+    <h1>
+        <i class="bi @(Id == null ? "bi-plus-circle-fill" : "bi-pencil-square") me-2"></i>
+        @(Id == null ? "Adaugă Ingredient Nou" : $"Editare Ingredient: {ingredient.Name}")
+    </h1>
+    <p class="text-muted">Gestionează detaliile ingredientului pentru a calcula corect prețurile rețetelor.</p>
+</div>
+
+@if (loading)
+{
+    <p><em>Se încarcă...</em></p>
+}
+else
+{
+    <EditForm Model="ingredient" OnValidSubmit="HandleSubmit" FormName="IngredientForm">
+        <DataAnnotationsValidator />
+        
+        <div class="card mb-4">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Nume Ingredient</label>
+                    <InputText @bind-Value="ingredient.Name" class="form-control" placeholder="Ex: Pui, Vită, Complex Vitamine..." />
+                    <ValidationMessage For="@(() => ingredient.Name)" />
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Categorie</label>
+                    <InputSelect @bind-Value="ingredient.Category" class="form-select" @onchange="OnCategoryChanged">
+                        @foreach (var category in Enum.GetValues<IngredientCategory>())
+                        {
+                            <option value="@category">@GetCategoryLabel(category)</option>
+                        }
+                    </InputSelect>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Preț de Bază (per Kg)</label>
+                    <div class="input-group">
+                        <InputNumber @bind-Value="ingredient.BasePricePerKg" class="form-control" />
+                        <span class="input-group-text">Lei</span>
+                    </div>
+                    <ValidationMessage For="@(() => ingredient.BasePricePerKg)" />
+                    <small class="text-muted">Prețul plătit către furnizor per KG.</small>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Multiplicator Preț Recomandat</label>
+                    <div class="input-group">
+                        <span class="input-group-text">x</span>
+                        <InputNumber @bind-Value="ingredient.RecommendedPriceMultiplier" class="form-control" step="0.1" />
+                    </div>
+                    <ValidationMessage For="@(() => ingredient.RecommendedPriceMultiplier)" />
+                    <small class="text-muted">Factor de multiplicare pentru prețul propus de vânzare.</small>
+                </div>
+            </div>
+
+            @if (ingredient.Category == IngredientCategory.CookedFood)
+            {
+                <div class="mt-4 p-4 rounded-3" style="background-color: var(--accent-yellow); border: 1px solid #efebe9;">
+                    <h5 class="mb-3 text-brown">Detalii pentru Aliment Gătit</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Ingredient Crud de Referință</label>
+                            <InputSelect @bind-Value="ingredient.ReferenceIngredientId" class="form-select">
+                                <option value="">-- Selectează Aliment Crud --</option>
+                                @foreach (var raw in rawIngredients)
+                                {
+                                    <option value="@raw.Id">@raw.Name</option>
+                                }
+                            </InputSelect>
+                            <small class="text-muted">Alege alimentul crud din care este preparat.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">Multiplicator Gătire</label>
+                            <InputNumber @bind-Value="ingredient.CookedMultiplier" class="form-control" step="0.1" />
+                            <small class="text-muted">Factor de pierdere la gătire (ex: 1kg gătit = X kg crud). De obicei > 1.</small>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save me-1"></i> Salvează Ingredientul
+            </button>
+            <a href="/ingredients" class="btn btn-secondary">
+                Anulează
+            </a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    
+    private Ingredient ingredient = new();
+    private List<Ingredient> rawIngredients = new();
+    private bool loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        rawIngredients = (await IngredientService.GetAllIngredientsAsync())
+            .Where(i => i.Category == IngredientCategory.RawFood && i.Id != Id)
+            .ToList();
+
+        if (Id != null)
+        {
+            var result = await IngredientService.GetIngredientByIdAsync(Id.Value);
+            if (result != null)
+            {
+                ingredient = result;
+            }
+        }
+        else
+        {
+            // Set defaults for new ingredient
+            ingredient.RecommendedPriceMultiplier = 2.0m;
+            ingredient.Category = IngredientCategory.RawFood;
+        }
+        loading = false;
+    }
+
+    private void OnCategoryChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<IngredientCategory>(e.Value?.ToString(), out var selectedCategory))
+        {
+            ingredient.Category = selectedCategory;
+            // Apply default multipliers based on category
+            if (selectedCategory == IngredientCategory.Vitamins)
+            {
+                ingredient.RecommendedPriceMultiplier = 1.2m;
+            }
+            else
+            {
+                ingredient.RecommendedPriceMultiplier = 2.0m;
+            }
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (Id == null)
+        {
+            await IngredientService.AddIngredientAsync(ingredient);
+        }
+        else
+        {
+            await IngredientService.UpdateIngredientAsync(ingredient);
+        }
+        NavigationManager.NavigateTo("/ingredients");
+    }
+
+    private string GetCategoryLabel(IngredientCategory category) => category switch
+    {
+        IngredientCategory.RawFood => "Aliment Crud",
+        IngredientCategory.CookedFood => "Aliment Gătit",
+        IngredientCategory.Vitamins => "Vitamine",
+        _ => category.ToString()
+    };
+}

@@ -1,0 +1,139 @@
+@page "/recipes/details/{Id:guid}"
+@inject RecipeService RecipeService
+@inject IngredientService IngredientService
+@rendermode InteractiveServer
+
+@if (recipe == null)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Se încarcă...</span>
+        </div>
+        <p class="mt-2 text-muted">Se încarcă detalii rețetă...</p>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+              <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="/recipes">Rețete</a></li>
+                <li class="breadcrumb-item active" aria-current="page">@recipe.Name</li>
+              </ol>
+            </nav>
+            <h1 class="mb-0"><i class="bi bi-file-earmark-text text-brown me-2"></i> @recipe.Name</h1>
+        </div>
+        
+        <div class="d-flex gap-3 align-items-center bg-white p-3 rounded-4 border shadow-sm">
+            <label class="fw-bold text-muted mb-0">Număr de porții:</label>
+            <input type="number" class="form-control text-center fw-bold" 
+                   style="width: 100px; font-size: 1.2rem; border-color: var(--accent-orange);" 
+                   @bind="portionsCount" @bind:event="oninput" min="1" />
+        </div>
+    </div>
+
+
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-4">
+            <div class="card h-100 text-center border-0 shadow-sm">
+                <div class="card-body">
+                    <span class="text-muted small fw-bold text-uppercase d-block mb-3">Preț Ideal Total</span>
+                    <h2 class="mb-0 fw-bold">@((recipe.IdealPrice * (decimal)portionsCount).ToString("N2")) Lei</h2>
+                    <small class="text-muted">(@recipe.IdealPrice.ToString("N2") Lei / porție)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 text-center border-0 shadow-sm border-start border-4 border-warning">
+                <div class="card-body">
+                    <span class="text-muted small fw-bold text-uppercase d-block mb-3">Preț Recomandat Total</span>
+                    <h2 class="mb-0 fw-bold text-primary">@((totalRecommended * (decimal)portionsCount).ToString("N2")) Lei</h2>
+                    <small class="text-muted">(@totalRecommended.ToString("N2") Lei / porție)</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 text-center border-0 shadow-sm" style="background-color: @(statusColor + "15");">
+                <div class="card-body">
+                    <span class="text-muted small fw-bold text-uppercase d-block mb-3">Diferență Totală</span>
+                    <h2 class="mb-0 fw-bold" style="color: @statusColor;">
+                        @(((recipe.IdealPrice - totalRecommended) * (decimal)portionsCount).ToString("N2")) Lei
+                    </h2>
+                    <div class="mt-2 status-badge" style="background-color: white; color: @statusColor; border: 1px solid @statusColor;">
+                        @RecipeService.GetDifferenceStatusText(difference)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm p-0 mb-4 overflow-hidden">
+        <div class="card-header bg-brown text-white py-3">
+            <h5 class="mb-0"><i class="bi bi-list-check me-2"></i> Ingrediente Necesar (Calculat pentru @portionsCount porții)</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr class="bg-light">
+                        <th class="ps-4">Nume Ingredient</th>
+                        <th class="text-center">Cantitate Totală (Grame)</th>
+                        <th class="text-end">Preț / Gramaj Real</th>
+                        <th class="text-end pe-4">Preț Recomandat / Gramaj</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ri in recipe.RecipeIngredients)
+                    {
+                        var ingredient = ri.Ingredient!;
+                        var recommendedPricePerGram = IngredientService.CalculateRecommendedPricePerKg(ingredient) / 1000m;
+                        var realPricePerGram = IngredientService.CalculateRealCostPerKg(ingredient) / 1000m;
+                        
+                        var totalQuantity = ri.QuantityGrams * (decimal)portionsCount;
+                        var rowRecommendedPrice = recommendedPricePerGram * totalQuantity;
+                        var rowRealPrice = realPricePerGram * totalQuantity;
+
+                        <tr>
+                            <td class="ps-4 fw-bold">@ingredient.Name</td>
+                            <td class="text-center">@totalQuantity.ToString("N0") g</td>
+                            <td class="text-end">@rowRealPrice.ToString("N3") Lei</td>
+                            <td class="text-end pe-4 text-success fw-bold">@rowRecommendedPrice.ToString("N3") Lei</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-light fw-bold">
+                    <tr>
+                        <td class="ps-4" colspan="2">TOTAL</td>
+                        <td class="text-end">@((recipe.RecipeIngredients.Sum(ri => (IngredientService.CalculateRealCostPerKg(ri.Ingredient!) / 1000m) * ri.QuantityGrams) * (decimal)portionsCount).ToString("N2")) Lei</td>
+                        <td class="text-end pe-4 text-success">@((totalRecommended * (decimal)portionsCount).ToString("N2")) Lei</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+    
+    <div class="d-flex gap-3 mb-5">
+        <a href="/recipes/edit/@recipe.Id" class="btn btn-primary d-flex align-items-center">
+            <i class="bi bi-pencil-square me-2"></i> Editează Rețetă
+        </a>
+        <a href="/recipes" class="btn btn-secondary d-flex align-items-center">
+            <i class="bi bi-arrow-left me-2"></i> Înapoi la Panou
+        </a>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private Recipe? recipe;
+    private int portionsCount = 1;
+
+    private decimal totalRecommended => recipe != null ? RecipeService.CalculateTotalRecommendedPrice(recipe) : 0;
+    private decimal difference => recipe != null ? recipe.IdealPrice - totalRecommended : 0;
+    private string statusColor => RecipeService.GetStatusColor(difference);
+
+    protected override async Task OnInitializedAsync()
+    {
+        recipe = await RecipeService.GetRecipeByIdAsync(Id);
+    }
+}
