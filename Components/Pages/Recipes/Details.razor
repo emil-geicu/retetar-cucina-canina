@@ -79,6 +79,7 @@ else
                     <tr class="bg-light">
                         <th class="ps-4">Nume Ingredient</th>
                         <th class="text-center">Cantitate Totală (Grame)</th>
+                        <th class="text-center">Cantitate necesară (Grame)</th>
                         <th class="text-end">Preț / Gramaj Real</th>
                         <th class="text-end pe-4">Preț Recomandat / Gramaj</th>
                     </tr>
@@ -91,12 +92,14 @@ else
                         var realPricePerGram = IngredientService.CalculateRealCostPerKg(ingredient) / 1000m;
                         
                         var totalQuantity = ri.QuantityGrams * (decimal)portionsCount;
+                        var requiredTotalQuantity = IngredientService.CalculateRequiredQuantityGrams(ingredient, totalQuantity);
                         var rowRecommendedPrice = recommendedPricePerGram * totalQuantity;
                         var rowRealPrice = realPricePerGram * totalQuantity;
 
                         <tr>
                             <td class="ps-4 fw-bold">@ingredient.Name</td>
                             <td class="text-center">@totalQuantity.ToString("N0") g</td>
+                            <td class="text-center fw-bold text-brown">@requiredTotalQuantity.ToString("N0") g</td>
                             <td class="text-end">@rowRealPrice.ToString("N3") Lei</td>
                             <td class="text-end pe-4 text-success fw-bold">@rowRecommendedPrice.ToString("N3") Lei</td>
                         </tr>
@@ -104,7 +107,7 @@ else
                 </tbody>
                 <tfoot class="table-light fw-bold">
                     <tr>
-                        <td class="ps-4" colspan="2">TOTAL</td>
+                        <td class="ps-4" colspan="3">TOTAL</td>
                         <td class="text-end">@((recipe.RecipeIngredients.Sum(ri => (IngredientService.CalculateRealCostPerKg(ri.Ingredient!) / 1000m) * ri.QuantityGrams) * (decimal)portionsCount).ToString("N2")) Lei</td>
                         <td class="text-end pe-4 text-success">@((totalRecommended * (decimal)portionsCount).ToString("N2")) Lei</td>
                     </tr>

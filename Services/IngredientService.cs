@@ -69,4 +69,14 @@ public class IngredientService(IDbContextFactory<AppDbContext> dbContextFactory)
     {
         return CalculateRealCostPerKg(ingredient) * ingredient.RecommendedPriceMultiplier;
     }
+
+    public decimal CalculateRequiredQuantityGrams(Ingredient ingredient, decimal quantityGrams)
+    {
+        if (ingredient.Category == IngredientCategory.CookedFood)
+        {
+            return quantityGrams * (ingredient.CookedMultiplier ?? 1.0m);
+        }
+
+        return quantityGrams;
+    }
 }

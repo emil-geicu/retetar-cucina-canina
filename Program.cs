@@ -20,15 +20,6 @@ builder.Services.AddScoped<RecipeService>();
 
 var app = builder.Build();
 
-// Seed data
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    var dbContextFactory = services.GetRequiredService<IDbContextFactory<AppDbContext>>();
-    await DbInitializer.Initialize(dbContextFactory);
-}
-
-
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {

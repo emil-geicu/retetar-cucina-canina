@@ -39,25 +39,28 @@ else
                     </InputSelect>
                 </div>
 
-                <div class="col-md-6">
-                    <label class="form-label fw-bold">Preț de Bază (per Kg)</label>
-                    <div class="input-group">
-                        <InputNumber @bind-Value="ingredient.BasePricePerKg" class="form-control" />
-                        <span class="input-group-text">Lei</span>
+                @if (ingredient.Category != IngredientCategory.CookedFood)
+                {
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Preț de Bază (per Kg)</label>
+                        <div class="input-group">
+                            <InputNumber @bind-Value="ingredient.BasePricePerKg" class="form-control" />
+                            <span class="input-group-text">Lei</span>
+                        </div>
+                        <ValidationMessage For="@(() => ingredient.BasePricePerKg)" />
+                        <small class="text-muted">Prețul plătit către furnizor per KG.</small>
                     </div>
-                    <ValidationMessage For="@(() => ingredient.BasePricePerKg)" />
-                    <small class="text-muted">Prețul plătit către furnizor per KG.</small>
-                </div>
 
-                <div class="col-md-6">
-                    <label class="form-label fw-bold">Multiplicator Preț Recomandat</label>
-                    <div class="input-group">
-                        <span class="input-group-text">x</span>
-                        <InputNumber @bind-Value="ingredient.RecommendedPriceMultiplier" class="form-control" step="0.1" />
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Multiplicator Preț Recomandat</label>
+                        <div class="input-group">
+                            <span class="input-group-text">x</span>
+                            <InputNumber @bind-Value="ingredient.RecommendedPriceMultiplier" class="form-control" step="0.1" />
+                        </div>
+                        <ValidationMessage For="@(() => ingredient.RecommendedPriceMultiplier)" />
+                        <small class="text-muted">Factor de multiplicare pentru prețul propus de vânzare.</small>
                     </div>
-                    <ValidationMessage For="@(() => ingredient.RecommendedPriceMultiplier)" />
-                    <small class="text-muted">Factor de multiplicare pentru prețul propus de vânzare.</small>
-                </div>
+                }
             </div>
 
             @if (ingredient.Category == IngredientCategory.CookedFood)
@@ -133,8 +136,12 @@ else
         if (Enum.TryParse<IngredientCategory>(e.Value?.ToString(), out var selectedCategory))
         {
             ingredient.Category = selectedCategory;
-            // Apply default multipliers based on category
-            if (selectedCategory == IngredientCategory.Vitamins)
+            if (selectedCategory == IngredientCategory.CookedFood)
+            {
+                ingredient.BasePricePerKg = 0;
+                ingredient.RecommendedPriceMultiplier = 2.0m;
+            }
+            else if (selectedCategory == IngredientCategory.Vitamins)
             {
                 ingredient.RecommendedPriceMultiplier = 1.2m;
             }
@@ -147,6 +154,12 @@ else
 
     private async Task HandleSubmit()
     {
+        if (ingredient.Category == IngredientCategory.CookedFood)
+        {
+            ingredient.BasePricePerKg = 0;
+            ingredient.RecommendedPriceMultiplier = 2.0m;
+        }
+
         if (Id == null)
         {
             await IngredientService.AddIngredientAsync(ingredient);
