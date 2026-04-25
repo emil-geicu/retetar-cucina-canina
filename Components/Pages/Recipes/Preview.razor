@@ -1,0 +1,111 @@
+@page "/recipes/preview/{Id:guid}"
+@inject RecipeService RecipeService
+@inject IJSRuntime JSRuntime
+@rendermode InteractiveServer
+
+<PageTitle>Previzualizare Rețetă - Client</PageTitle>
+
+@if (recipe == null)
+{
+    <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Se încarcă...</span>
+        </div>
+        <p class="mt-2 text-muted">Se încarcă previzualizarea...</p>
+    </div>
+}
+else
+{
+    <div class="d-print-none d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1 text-brown fw-bold">Previzualizare Client</h2>
+            <small class="text-muted">Ecran optimizat pentru print și trimitere către client.</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="/recipes/details/@recipe.Id" class="btn btn-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Înapoi la detalii
+            </a>
+            <button class="btn btn-primary" @onclick="PrintPage">
+                <i class="bi bi-printer me-1"></i> Printează
+            </button>
+        </div>
+    </div>
+
+    <div class="recipe-preview-card p-4 p-md-5">
+        <div class="d-flex justify-content-between align-items-start mb-4 border-bottom pb-3">
+            <div>
+                <h1 class="mb-1 text-brown fw-bold">@recipe.Name</h1>
+                <div class="text-muted fw-semibold">Plan alimentar / rețetă personalizată</div>
+            </div>
+            <div class="text-end">
+                <div class="small text-muted text-uppercase fw-bold">Porții</div>
+                <div class="h3 mb-0 text-brown fw-bold">@portionsCount</div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-md-6">
+                <div class="preview-metric">
+                    <span class="preview-metric-label">Număr de porții</span>
+                    <span class="preview-metric-value">@portionsCount</span>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="preview-metric">
+                    <span class="preview-metric-label">Cantitate totală rețetă</span>
+                    <span class="preview-metric-value">@FormatQuantity(totalRecipeQuantity) g</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 recipe-preview-table">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Ingredient</th>
+                        <th class="text-center pe-4">Cantitate totală (Grame)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ri in recipe.RecipeIngredients)
+                    {
+                        var totalQuantity = ri.QuantityGrams * (decimal)portionsCount;
+                        <tr>
+                            <td class="ps-4 fw-semibold">@ri.Ingredient!.Name</td>
+                            <td class="text-center pe-4 fw-semibold">@FormatQuantity(totalQuantity) g</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td class="ps-4 fw-bold">TOTAL REȚETĂ</td>
+                        <td class="text-center pe-4 fw-bold text-brown">@FormatQuantity(totalRecipeQuantity) g</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [SupplyParameterFromQuery(Name = "portions")] public int? PortionsQuery { get; set; }
+
+    private Recipe? recipe;
+    private int portionsCount = 1;
+    private decimal totalRecipeQuantity => recipe?.RecipeIngredients.Sum(ri => ri.QuantityGrams * (decimal)portionsCount) ?? 0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        recipe = await RecipeService.GetRecipeByIdAsync(Id);
+        portionsCount = PortionsQuery.HasValue && PortionsQuery.Value > 0 ? PortionsQuery.Value : 1;
+    }
+
+    private async Task PrintPage()
+    {
+        await JSRuntime.InvokeVoidAsync("window.print");
+    }
+
+    private static string FormatQuantity(decimal quantity)
+        => quantity.ToString("N3").TrimEnd('0').TrimEnd(',').TrimEnd('.');
+}

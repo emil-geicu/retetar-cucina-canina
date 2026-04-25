@@ -187,3 +187,101 @@ h1, h2, h3, h4 {
     background-color: var(--accent-orange) !important;
     color: #fff !important;
 }
+
+.recipe-preview-card {
+    background: #fff;
+    border: 1px solid #e6dfd6;
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+}
+
+.preview-metric {
+    border: 1px solid #eadfce;
+    background: #fffaf3;
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.preview-metric-label {
+    color: #6f625b;
+    font-weight: 600;
+}
+
+.preview-metric-value {
+    color: var(--accent-brown);
+    font-weight: 700;
+}
+
+.recipe-preview-table {
+    box-shadow: none;
+}
+
+.recipe-preview-table tfoot td {
+    border-top: 2px solid #d8c3a8;
+    background: #fffaf3;
+}
+
+@page {
+    size: A4 portrait;
+    margin: 12mm;
+}
+
+@media print {
+    .sidebar,
+    .top-row,
+    .d-print-none {
+        display: none !important;
+    }
+
+    html,
+    body {
+        background: #fff !important;
+        font-size: 11pt;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .page,
+    main,
+    article {
+        display: block !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .table-responsive {
+        overflow: visible !important;
+    }
+
+    .recipe-preview-card {
+        border: none;
+        box-shadow: none;
+        border-radius: 0;
+        padding: 0 !important;
+        max-width: 186mm;
+        margin: 0 auto !important;
+        break-inside: avoid-page;
+        page-break-inside: avoid;
+    }
+
+    .preview-metric,
+    .recipe-preview-table tr,
+    .recipe-preview-table thead,
+    .recipe-preview-table tfoot {
+        break-inside: avoid-page;
+        page-break-inside: avoid;
+    }
+
+    .recipe-preview-table thead {
+        display: table-header-group;
+    }
+
+    .recipe-preview-table tfoot {
+        display: table-footer-group;
+    }
+}
