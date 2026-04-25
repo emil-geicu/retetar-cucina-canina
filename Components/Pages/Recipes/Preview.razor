@@ -56,6 +56,12 @@ else
                     <span class="preview-metric-value">@FormatQuantity(totalRecipeQuantity) g</span>
                 </div>
             </div>
+            <div class="col-md-6">
+                <div class="preview-metric">
+                    <span class="preview-metric-label">Cantitate totală per porție</span>
+                    <span class="preview-metric-value">@FormatQuantity(totalPerPortionQuantity) g</span>
+                </div>
+            </div>
         </div>
 
         <div class="table-responsive">
@@ -63,15 +69,18 @@ else
                 <thead>
                     <tr>
                         <th class="ps-4">Ingredient</th>
+                        <th class="text-center">Cantitate per porție (Grame)</th>
                         <th class="text-center pe-4">Cantitate totală (Grame)</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var ri in recipe.RecipeIngredients)
                     {
+                        var perPortionQuantity = ri.QuantityGrams;
                         var totalQuantity = ri.QuantityGrams * (decimal)portionsCount;
                         <tr>
                             <td class="ps-4 fw-semibold">@ri.Ingredient!.Name</td>
+                            <td class="text-center fw-semibold">@FormatQuantity(perPortionQuantity) g</td>
                             <td class="text-center pe-4 fw-semibold">@FormatQuantity(totalQuantity) g</td>
                         </tr>
                     }
@@ -79,6 +88,7 @@ else
                 <tfoot>
                     <tr>
                         <td class="ps-4 fw-bold">TOTAL REȚETĂ</td>
+                        <td class="text-center fw-bold text-brown">@FormatQuantity(totalPerPortionQuantity) g</td>
                         <td class="text-center pe-4 fw-bold text-brown">@FormatQuantity(totalRecipeQuantity) g</td>
                     </tr>
                 </tfoot>
@@ -93,6 +103,7 @@ else
 
     private Recipe? recipe;
     private int portionsCount = 1;
+    private decimal totalPerPortionQuantity => recipe?.RecipeIngredients.Sum(ri => ri.QuantityGrams) ?? 0;
     private decimal totalRecipeQuantity => recipe?.RecipeIngredients.Sum(ri => ri.QuantityGrams * (decimal)portionsCount) ?? 0;
 
     protected override async Task OnParametersSetAsync()
