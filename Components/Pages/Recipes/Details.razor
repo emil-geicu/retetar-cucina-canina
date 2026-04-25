@@ -49,8 +49,8 @@ else
             <div class="card h-100 text-center border-0 shadow-sm border-start border-4 border-warning">
                 <div class="card-body">
                     <span class="text-muted small fw-bold text-uppercase d-block mb-3">Preț Recomandat Total</span>
-                    <h2 class="mb-0 fw-bold text-primary">@((totalRecommended * (decimal)portionsCount).ToString("N2")) Lei</h2>
-                    <small class="text-muted">(@totalRecommended.ToString("N2") Lei / porție)</small>
+                    <h2 class="mb-0 fw-bold text-primary">@FormatLei(totalRecommended * (decimal)portionsCount) Lei</h2>
+                    <small class="text-muted">(@FormatLei(totalRecommended) Lei / porție)</small>
                 </div>
             </div>
         </div>
@@ -59,7 +59,7 @@ else
                 <div class="card-body">
                     <span class="text-muted small fw-bold text-uppercase d-block mb-3">Diferență Totală</span>
                     <h2 class="mb-0 fw-bold" style="color: @statusColor;">
-                        @(((recipe.IdealPrice - totalRecommended) * (decimal)portionsCount).ToString("N2")) Lei
+                        @FormatLei((recipe.IdealPrice - totalRecommended) * (decimal)portionsCount) Lei
                     </h2>
                     <div class="mt-2 status-badge" style="background-color: white; color: @statusColor; border: 1px solid @statusColor;">
                         @RecipeService.GetDifferenceStatusText(difference)
@@ -76,7 +76,7 @@ else
         <div class="table-responsive">
             <table class="table table-hover mb-0">
                 <thead>
-                    <tr class="bg-light">
+                    <tr>
                         <th class="ps-4">Nume Ingredient</th>
                         <th class="text-center">Cantitate Totală (Grame)</th>
                         <th class="text-center">Cantitate necesară (Grame)</th>
@@ -98,18 +98,18 @@ else
 
                         <tr>
                             <td class="ps-4 fw-bold">@ingredient.Name</td>
-                            <td class="text-center">@totalQuantity.ToString("N0") g</td>
-                            <td class="text-center fw-bold text-brown">@requiredTotalQuantity.ToString("N0") g</td>
-                            <td class="text-end">@rowRealPrice.ToString("N3") Lei</td>
-                            <td class="text-end pe-4 text-success fw-bold">@rowRecommendedPrice.ToString("N3") Lei</td>
+                            <td class="text-center">@totalQuantity.ToString("N3") g</td>
+                            <td class="text-center fw-bold text-brown">@requiredTotalQuantity.ToString("N3") g</td>
+                            <td class="text-end">@FormatLei(rowRealPrice, 3, 6, 0.001m) Lei</td>
+                            <td class="text-end pe-4 text-success fw-bold">@FormatLei(rowRecommendedPrice, 3, 6, 0.001m) Lei</td>
                         </tr>
                     }
                 </tbody>
                 <tfoot class="table-light fw-bold">
                     <tr>
                         <td class="ps-4" colspan="3">TOTAL</td>
-                        <td class="text-end">@((recipe.RecipeIngredients.Sum(ri => (IngredientService.CalculateRealCostPerKg(ri.Ingredient!) / 1000m) * ri.QuantityGrams) * (decimal)portionsCount).ToString("N2")) Lei</td>
-                        <td class="text-end pe-4 text-success">@((totalRecommended * (decimal)portionsCount).ToString("N2")) Lei</td>
+                        <td class="text-end">@FormatLei(recipe.RecipeIngredients.Sum(ri => (IngredientService.CalculateRealCostPerKg(ri.Ingredient!) / 1000m) * ri.QuantityGrams) * (decimal)portionsCount) Lei</td>
+                        <td class="text-end pe-4 text-success">@FormatLei(totalRecommended * (decimal)portionsCount) Lei</td>
                     </tr>
                 </tfoot>
             </table>
@@ -134,6 +134,11 @@ else
     private decimal totalRecommended => recipe != null ? RecipeService.CalculateTotalRecommendedPrice(recipe) : 0;
     private decimal difference => recipe != null ? recipe.IdealPrice - totalRecommended : 0;
     private string statusColor => RecipeService.GetStatusColor(difference);
+
+    private static string FormatLei(decimal amount, int normalDecimals = 2, int tinyDecimals = 6, decimal tinyThreshold = 0.01m)
+        => amount != 0 && Math.Abs(amount) < tinyThreshold
+            ? amount.ToString($"N{tinyDecimals}")
+            : amount.ToString($"N{normalDecimals}");
 
     protected override async Task OnInitializedAsync()
     {

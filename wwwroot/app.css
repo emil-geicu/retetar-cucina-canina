@@ -96,6 +96,22 @@ a:hover {
     box-shadow: var(--card-shadow);
 }
 
+/* Keep tables inside cards visually continuous with the card header */
+.card .table {
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.card .table thead th:first-child,
+.card .table tbody tr:first-child td:first-child {
+    border-top-left-radius: 0;
+}
+
+.card .table thead th:last-child,
+.card .table tbody tr:first-child td:last-child {
+    border-top-right-radius: 0;
+}
+
 .table th {
     background-color: var(--accent-brown);
     color: #fff;
@@ -147,4 +163,27 @@ h1, h2, h3, h4 {
 
 .ingredient-row:hover {
     background-color: #fafafa;
+}
+
+.bg-brown {
+    background-color: var(--accent-brown) !important;
+}
+
+.text-brown {
+    color: var(--accent-brown) !important;
+}
+
+.bg-accent-orange {
+    background-color: var(--accent-orange) !important;
+}
+
+/* Force strong contrast on card section headers */
+.card-header.bg-brown {
+    background-color: var(--accent-brown) !important;
+    color: #fff !important;
+}
+
+.card-header.bg-accent-orange {
+    background-color: var(--accent-orange) !important;
+    color: #fff !important;
 }

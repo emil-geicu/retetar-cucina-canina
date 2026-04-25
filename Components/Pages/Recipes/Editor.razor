@@ -50,7 +50,7 @@ else
                     
                     <div class="table-responsive">
                         <table class="table table-hover align-middle">
-                            <thead class="bg-light">
+                            <thead>
                                 <tr>
                                     <th style="width: 35%;">Ingredient</th>
                                     <th class="text-center" style="width: 18%;">Cantitate (Grame)</th>
@@ -74,15 +74,15 @@ else
                                         <td class="text-center">
                                             <div class="input-group input-group-sm">
                                                 <input type="number" class="form-control text-center" 
-                                                       @bind="ri.QuantityGrams" @bind:event="oninput" min="1" />
+                                                       @bind="ri.QuantityGrams" @bind:event="oninput" min="0.001" step="0.001" />
                                                 <span class="input-group-text">g</span>
                                             </div>
                                         </td>
                                         <td class="text-center fw-bold text-brown">
-                                            @requiredQuantityGrams.ToString("N0") g
+                                            @requiredQuantityGrams.ToString("N3") g
                                         </td>
                                         <td class="text-end">
-                                            <span class="text-success fw-bold">@rowRecommendedPrice.ToString("N3") Lei</span>
+                                            <span class="text-success fw-bold">@FormatLei(rowRecommendedPrice, 3, 6, 0.001m) Lei</span>
                                         </td>
                                         <td class="text-center">
                                             <button class="btn btn-sm btn-outline-danger border-0" @onclick="() => RemoveIngredient(ri)">
@@ -162,13 +162,13 @@ else
 
                     <div class="mb-3 d-flex justify-content-between">
                         <span class="text-muted">Total Recomandat:</span>
-                        <span class="fw-bold text-primary">@totalRecommended.ToString("N2") Lei</span>
+                        <span class="fw-bold text-primary">@FormatLei(totalRecommended) Lei</span>
                     </div>
 
                     <div class="recipe-financials mt-4 text-center" style="background-color: @(statusColor + "15"); border-color: @statusColor;">
                         <span class="text-muted small fw-bold text-uppercase d-block mb-1">Diferență Profit</span>
                         <h2 class="mb-1 fw-bold" style="color: @statusColor;">
-                            @((difference >= 0 ? "+" : ""))@difference.ToString("N2") Lei
+                            @((difference >= 0 ? "+" : ""))@FormatLei(difference) Lei
                         </h2>
                         <div class="fw-bold" style="color: @statusColor;">
                             @RecipeService.GetDifferenceStatusText(difference)
@@ -288,4 +288,9 @@ else
         IngredientCategory.Vitamins => "Vitamine",
         _ => category.ToString()
     };
+
+    private static string FormatLei(decimal amount, int normalDecimals = 2, int tinyDecimals = 6, decimal tinyThreshold = 0.01m)
+        => amount != 0 && Math.Abs(amount) < tinyThreshold
+            ? amount.ToString($"N{tinyDecimals}")
+            : amount.ToString($"N{normalDecimals}");
 }
