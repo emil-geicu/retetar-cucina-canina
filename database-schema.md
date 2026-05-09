@@ -40,6 +40,10 @@ Name (NVARCHAR(150), NOT NULL) - Name of the recipe.
 
 IdealPrice (DECIMAL(18,4), NOT NULL) - The target sale price per portion set by the admin.
 
+UseCustomProductionFactor (BIT, NOT NULL) - Enables custom recipe-level pricing exception that ignores per-ingredient recommended multipliers.
+
+CustomProductionFactor (DECIMAL(18,4), NULL) - Custom multiplier applied to the total real production cost when the exception toggle is enabled.
+
 Table: RecipeIngredients (Join Table)
 
 Maps the many-to-many relationship between Recipes and Ingredients, storing the specific quantity used.

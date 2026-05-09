@@ -44,6 +44,29 @@ else
                         <small class="text-muted">Prețul la care dorești să vinzi o porție.</small>
                     </div>
 
+                    <div class="mb-4 p-3 rounded-3 border" style="background-color: #fff8e1;">
+                        <div class="form-check form-switch">
+                            <InputCheckbox @bind-Value="useCustomProductionFactor" class="form-check-input" id="customFactorToggle" />
+                            <label class="form-check-label fw-bold" for="customFactorToggle">
+                                Folosește factor custom pentru costul de producție
+                            </label>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            Când este activ, se ignoră multiplicatorii recomandați ai ingredientelor (ex: x2), iar totalul real este înmulțit cu factorul de mai jos.
+                        </small>
+
+                        @if (useCustomProductionFactor)
+                        {
+                            <div class="mt-3">
+                                <label class="form-label fw-bold">Factor multiplicare custom</label>
+                                <div class="input-group" style="max-width: 260px;">
+                                    <span class="input-group-text">x</span>
+                                    <InputNumber @bind-Value="customProductionFactor" class="form-control" min="0.01" step="0.1" />
+                                </div>
+                            </div>
+                        }
+                    </div>
+
                     <hr />
 
                     <h5 class="mt-4 mb-3 fw-bold">2. Ingrediente Rețetă</h5>
@@ -62,8 +85,7 @@ else
                             <tbody>
                                 @foreach (var ri in selectedIngredients)
                                 {
-                                    var recommendedPricePerGram = IngredientService.CalculateRecommendedPricePerKg(ri.Ingredient!) / 1000m;
-                                    var rowRecommendedPrice = recommendedPricePerGram * ri.QuantityGrams;
+                                    var rowRecommendedPrice = CalculateRowRecommendedPrice(ri);
                                     var requiredQuantityGrams = IngredientService.CalculateRequiredQuantityGrams(ri.Ingredient!, ri.QuantityGrams);
 
                                     <tr>
@@ -165,6 +187,13 @@ else
                         <span class="fw-bold text-primary">@FormatLei(totalRecommended) Lei</span>
                     </div>
 
+                    @if (useCustomProductionFactor)
+                    {
+                        <small class="text-warning-emphasis d-block">
+                            Excepție activă: totalul real este multiplicat cu factorul x@effectiveCustomFactor.ToString("N2")
+                        </small>
+                    }
+
                     <div class="recipe-financials mt-4 text-center" style="background-color: @(statusColor + "15"); border-color: @statusColor;">
                         <span class="text-muted small fw-bold text-uppercase d-block mb-1">Diferență Profit</span>
                         <h2 class="mb-1 fw-bold" style="color: @statusColor;">
@@ -176,7 +205,7 @@ else
                     </div>
 
                     <div class="mt-5 d-grid gap-2">
-                        <button class="btn btn-lg btn-primary shadow-sm" @onclick="HandleSave" disabled="@(string.IsNullOrWhiteSpace(recipeName) || !selectedIngredients.Any())">
+                        <button class="btn btn-lg btn-primary shadow-sm" @onclick="HandleSave" disabled="@(string.IsNullOrWhiteSpace(recipeName) || !selectedIngredients.Any() || (useCustomProductionFactor && customProductionFactor <= 0))">
                             <i class="bi bi-save me-2"></i> Salvează Rețeta
                         </button>
                         <a href="/recipes" class="btn btn-secondary shadow-sm">
@@ -199,8 +228,10 @@ else
     private string ingredientSearchTerm = "";
     private bool showSearchResults = false;
     private bool loading = true;
+    private bool useCustomProductionFactor = false;
+    private decimal customProductionFactor = 1.0m;
 
-    private decimal totalRecommended => selectedIngredients.Sum(ri => (IngredientService.CalculateRecommendedPricePerKg(ri.Ingredient!) / 1000m) * ri.QuantityGrams);
+    private decimal totalRecommended => selectedIngredients.Sum(CalculateRowRecommendedPrice);
     private decimal difference => idealPrice - totalRecommended;
     private string statusColor => RecipeService.GetStatusColor(difference);
 
@@ -216,6 +247,12 @@ else
                 recipeName = recipe.Name;
                 idealPrice = recipe.IdealPrice;
                 selectedIngredients = recipe.RecipeIngredients.ToList();
+                useCustomProductionFactor = recipe.UseCustomProductionFactor;
+                customProductionFactor = recipe.CustomProductionFactor ?? 1.0m;
+                if (customProductionFactor <= 0)
+                {
+                    customProductionFactor = 1.0m;
+                }
             }
         }
 
@@ -269,6 +306,8 @@ else
             Id = Id ?? Guid.NewGuid(),
             Name = recipeName,
             IdealPrice = idealPrice,
+            UseCustomProductionFactor = useCustomProductionFactor,
+            CustomProductionFactor = useCustomProductionFactor ? effectiveCustomFactor : null,
             RecipeIngredients = selectedIngredients.Select(si => new RecipeIngredient 
             { 
                 IngredientId = si.IngredientId, 
@@ -280,6 +319,21 @@ else
         await RecipeService.SaveRecipeAsync(recipe);
         NavigationManager.NavigateTo("/recipes");
     }
+
+    private decimal CalculateRowRecommendedPrice(RecipeIngredient recipeIngredient)
+    {
+        if (recipeIngredient.Ingredient == null) return 0;
+
+        var draftRecipe = new Recipe
+        {
+            UseCustomProductionFactor = useCustomProductionFactor,
+            CustomProductionFactor = useCustomProductionFactor ? effectiveCustomFactor : null
+        };
+
+        return RecipeService.CalculateRowRecommendedPrice(draftRecipe, recipeIngredient);
+    }
+
+    private decimal effectiveCustomFactor => customProductionFactor > 0 ? customProductionFactor : 1.0m;
 
     private string GetCategoryLabel(IngredientCategory category) => category switch
     {

@@ -43,11 +43,23 @@ public class RecipeService(IDbContextFactory<AppDbContext> dbContextFactory, Ing
             context.RecipeIngredients.RemoveRange(existingRecipe.RecipeIngredients);
             existingRecipe.Name = recipe.Name;
             existingRecipe.IdealPrice = recipe.IdealPrice;
+            existingRecipe.UseCustomProductionFactor = recipe.UseCustomProductionFactor;
+            existingRecipe.CustomProductionFactor = recipe.UseCustomProductionFactor
+                ? GetEffectiveCustomFactor(recipe)
+                : null;
             existingRecipe.RecipeIngredients = recipe.RecipeIngredients;
             context.Recipes.Update(existingRecipe);
         }
         else
         {
+            if (recipe.UseCustomProductionFactor)
+            {
+                recipe.CustomProductionFactor = GetEffectiveCustomFactor(recipe);
+            }
+            else
+            {
+                recipe.CustomProductionFactor = null;
+            }
             context.Recipes.Add(recipe);
         }
         await context.SaveChangesAsync();
@@ -67,16 +79,27 @@ public class RecipeService(IDbContextFactory<AppDbContext> dbContextFactory, Ing
     // Business Logic: Total Recommended Price for one portion
     public decimal CalculateTotalRecommendedPrice(Recipe recipe)
     {
-        decimal total = 0;
-        foreach (var ri in recipe.RecipeIngredients)
+        if (recipe.UseCustomProductionFactor)
         {
-            if (ri.Ingredient != null)
-            {
-                var recommendedPricePerGram = ingredientService.CalculateRecommendedPricePerKg(ri.Ingredient) / 1000m;
-                total += recommendedPricePerGram * ri.QuantityGrams;
-            }
+            return CalculateTotalRealPrice(recipe) * GetEffectiveCustomFactor(recipe);
         }
-        return total;
+
+        return recipe.RecipeIngredients.Sum(CalculateDefaultRecommendedRowPrice);
+    }
+
+    public decimal CalculateTotalRealPrice(Recipe recipe)
+    {
+        return recipe.RecipeIngredients.Sum(CalculateRealRowPrice);
+    }
+
+    public decimal CalculateRowRecommendedPrice(Recipe recipe, RecipeIngredient recipeIngredient)
+    {
+        if (recipe.UseCustomProductionFactor)
+        {
+            return CalculateRealRowPrice(recipeIngredient) * GetEffectiveCustomFactor(recipe);
+        }
+
+        return CalculateDefaultRecommendedRowPrice(recipeIngredient);
     }
 
     // Business Logic: Profit Difference
@@ -99,5 +122,31 @@ public class RecipeService(IDbContextFactory<AppDbContext> dbContextFactory, Ing
         if (difference > 0) return "PROFIT POZITIV";
         if (difference == 0) return "EGALITATE";
         return "PIERDERE / SUB PREȚ RECOMANDAT";
+    }
+
+    private decimal CalculateRealRowPrice(RecipeIngredient recipeIngredient)
+    {
+        if (recipeIngredient.Ingredient == null) return 0;
+
+        var realPricePerGram = ingredientService.CalculateRealCostPerKg(recipeIngredient.Ingredient) / 1000m;
+        return realPricePerGram * recipeIngredient.QuantityGrams;
+    }
+
+    private decimal CalculateDefaultRecommendedRowPrice(RecipeIngredient recipeIngredient)
+    {
+        if (recipeIngredient.Ingredient == null) return 0;
+
+        var recommendedPricePerGram = ingredientService.CalculateRecommendedPricePerKg(recipeIngredient.Ingredient) / 1000m;
+        return recommendedPricePerGram * recipeIngredient.QuantityGrams;
+    }
+
+    private static decimal GetEffectiveCustomFactor(Recipe recipe)
+    {
+        if (recipe.CustomProductionFactor.HasValue && recipe.CustomProductionFactor.Value > 0)
+        {
+            return recipe.CustomProductionFactor.Value;
+        }
+
+        return 1.0m;
     }
 }

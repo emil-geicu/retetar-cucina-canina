@@ -12,5 +12,9 @@ public class Recipe
 
     public decimal IdealPrice { get; set; }
 
+    public bool UseCustomProductionFactor { get; set; }
+
+    public decimal? CustomProductionFactor { get; set; }
+
     public ICollection<RecipeIngredient> RecipeIngredients { get; set; } = new List<RecipeIngredient>();
 }
