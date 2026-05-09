@@ -16,12 +16,27 @@
         <div class="col-auto">
             <i class="bi bi-search text-muted"></i>
         </div>
-        <div class="col">
+        <div class="col-md-8">
             <input type="text" class="form-control border-0" placeholder="Caută după nume ingredient..." 
-                   @bind="searchTerm" @bind:event="oninput" />
+                   @bind="SearchTerm" @bind:event="oninput" />
+        </div>
+        <div class="col-md-4">
+            <select class="form-select" @bind="SelectedCategoryFilter">
+                <option value="all">Toate categoriile</option>
+                <option value="@IngredientCategory.RawFood.ToString()">@GetCategoryLabel(IngredientCategory.RawFood)</option>
+                <option value="@IngredientCategory.CookedFood.ToString()">@GetCategoryLabel(IngredientCategory.CookedFood)</option>
+                <option value="@IngredientCategory.Vitamins.ToString()">@GetCategoryLabel(IngredientCategory.Vitamins)</option>
+            </select>
         </div>
     </div>
 </div>
+
+@if (!string.IsNullOrWhiteSpace(deleteErrorMessage))
+{
+    <div class="alert alert-warning" role="alert">
+        @deleteErrorMessage
+    </div>
+}
 
 @if (ingredients == null)
 {
@@ -54,13 +69,13 @@ else
                     <th style="border-top-left-radius: 12px;">Nume</th>
                     <th>Categorie</th>
                     <th>Preț/Kg</th>
-                    <th>Mul. Recom.</th>
+                    <th>Factor</th>
                     <th>Preț Recom./Kg</th>
                     <th class="text-center" style="border-top-right-radius: 12px;">Acțiuni</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var item in GetFilteredIngredients())
+                @foreach (var item in GetPagedIngredients())
                 {
                     <tr class="ingredient-row">
                         <td class="fw-bold">@item.Name</td>
@@ -70,7 +85,7 @@ else
                             </span>
                         </td>
                         <td class="fw-bold text-brown">@IngredientService.CalculateRealCostPerKg(item).ToString("N2") Lei</td>
-                        <td>x @item.RecommendedPriceMultiplier.ToString("N2")</td>
+                        <td>x @GetDisplayMultiplier(item).ToString("N2")</td>
                         <td class="text-success fw-bold">
                             @IngredientService.CalculateRecommendedPricePerKg(item).ToString("N2") Lei
                         </td>
@@ -87,11 +102,57 @@ else
             </tbody>
         </table>
     </div>
+
+    @if (TotalPages > 1)
+    {
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="text-muted small">
+                Pagina @currentPage din @TotalPages (@FilteredCount rezultate)
+            </div>
+            <div class="btn-group" role="group" aria-label="Paginare ingrediente">
+                <button class="btn btn-outline-secondary" @onclick="PreviousPage" disabled="@(currentPage == 1)">
+                    <i class="bi bi-chevron-left"></i> Anterior
+                </button>
+                <button class="btn btn-outline-secondary" @onclick="NextPage" disabled="@(currentPage == TotalPages)">
+                    Următor <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    }
 }
 
 @code {
     private List<Ingredient>? ingredients;
     private string searchTerm = "";
+    private string? deleteErrorMessage;
+    private string selectedCategoryFilter = "all";
+    private int currentPage = 1;
+    private const int PageSize = 10;
+
+    private string SearchTerm
+    {
+        get => searchTerm;
+        set
+        {
+            if (searchTerm == value) return;
+            searchTerm = value;
+            currentPage = 1;
+        }
+    }
+
+    private string SelectedCategoryFilter
+    {
+        get => selectedCategoryFilter;
+        set
+        {
+            if (selectedCategoryFilter == value) return;
+            selectedCategoryFilter = value;
+            currentPage = 1;
+        }
+    }
+
+    private int FilteredCount => GetFilteredIngredients().Count();
+    private int TotalPages => Math.Max(1, (int)Math.Ceiling(FilteredCount / (double)PageSize));
 
     protected override async Task OnInitializedAsync()
     {
@@ -101,11 +162,43 @@ else
     private IEnumerable<Ingredient> GetFilteredIngredients()
     {
         if (ingredients == null) return Enumerable.Empty<Ingredient>();
-        
-        if (string.IsNullOrWhiteSpace(searchTerm))
-            return ingredients;
-            
-        return ingredients.Where(i => i.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+
+        IEnumerable<Ingredient> filtered = ingredients;
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            filtered = filtered.Where(i => i.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (SelectedCategoryFilter != "all" && Enum.TryParse<IngredientCategory>(SelectedCategoryFilter, out var category))
+        {
+            filtered = filtered.Where(i => i.Category == category);
+        }
+
+        return filtered;
+    }
+
+    private IEnumerable<Ingredient> GetPagedIngredients()
+    {
+        var filtered = GetFilteredIngredients();
+        var totalPages = TotalPages;
+        if (currentPage > totalPages) currentPage = totalPages;
+        return filtered.Skip((currentPage - 1) * PageSize).Take(PageSize);
+    }
+
+    private decimal GetDisplayMultiplier(Ingredient ingredient)
+        => ingredient.Category == IngredientCategory.CookedFood
+            ? (ingredient.CookedMultiplier ?? 1.0m)
+            : ingredient.RecommendedPriceMultiplier;
+
+    private void PreviousPage()
+    {
+        if (currentPage > 1) currentPage--;
+    }
+
+    private void NextPage()
+    {
+        if (currentPage < TotalPages) currentPage++;
     }
 
     private string GetCategoryLabel(IngredientCategory category) => category switch
@@ -126,11 +219,20 @@ else
 
     private async Task DeleteIngredient(Ingredient item)
     {
+        deleteErrorMessage = null;
         var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", $"Sigur dorești să ștergi ingredientul '{item.Name}'?");
         if (confirmed)
         {
-            await IngredientService.DeleteIngredientAsync(item.Id);
-            ingredients = await IngredientService.GetAllIngredientsAsync();
+            try
+            {
+                await IngredientService.DeleteIngredientAsync(item.Id);
+                ingredients = await IngredientService.GetAllIngredientsAsync();
+                if (currentPage > TotalPages) currentPage = TotalPages;
+            }
+            catch (InvalidOperationException ex)
+            {
+                deleteErrorMessage = ex.Message;
+            }
         }
     }
 }

@@ -42,11 +42,19 @@ public class IngredientService(IDbContextFactory<AppDbContext> dbContextFactory)
     {
         using var context = await dbContextFactory.CreateDbContextAsync();
         var ingredient = await context.Ingredients.FindAsync(id);
-        if (ingredient != null)
+        if (ingredient == null) return;
+
+        var usedInCookedIngredientsCount = await context.Ingredients.CountAsync(i => i.ReferenceIngredientId == id);
+        var usedInRecipesCount = await context.RecipeIngredients.CountAsync(ri => ri.IngredientId == id);
+
+        if (usedInCookedIngredientsCount > 0 || usedInRecipesCount > 0)
         {
-            context.Ingredients.Remove(ingredient);
-            await context.SaveChangesAsync();
+            throw new InvalidOperationException(
+                $"Ingredientul nu poate fi șters. Este folosit în {usedInCookedIngredientsCount} ingrediente gătite și {usedInRecipesCount} rețete. Șterge mai întâi dependențele.");
         }
+
+        context.Ingredients.Remove(ingredient);
+        await context.SaveChangesAsync();
     }
 
     // Logic: Real Cost per Kg

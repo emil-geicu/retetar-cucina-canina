@@ -1,5 +1,6 @@
 @page "/recipes/preview/{Id:guid}"
 @inject RecipeService RecipeService
+@inject IngredientService IngredientService
 @inject IJSRuntime JSRuntime
 @rendermode InteractiveServer
 
@@ -52,13 +53,13 @@ else
             </div>
             <div class="col-md-6">
                 <div class="preview-metric">
-                    <span class="preview-metric-label">Cantitate totală rețetă</span>
+                    <span class="preview-metric-label">Cantitate totală rețetă (fără vitamine)</span>
                     <span class="preview-metric-value">@FormatQuantity(totalRecipeQuantity) g</span>
                 </div>
             </div>
             <div class="col-md-6">
                 <div class="preview-metric">
-                    <span class="preview-metric-label">Cantitate totală per porție</span>
+                    <span class="preview-metric-label">Cantitate totală per porție (fără vitamine)</span>
                     <span class="preview-metric-value">@FormatQuantity(totalPerPortionQuantity) g</span>
                 </div>
             </div>
@@ -71,6 +72,7 @@ else
                         <th class="ps-4">Ingredient</th>
                         <th class="text-center">Cantitate per porție (Grame)</th>
                         <th class="text-center pe-4">Cantitate totală (Grame)</th>
+                        <th class="text-center pe-4">Cantitate eliberată (Grame)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -78,10 +80,16 @@ else
                     {
                         var perPortionQuantity = ri.QuantityGrams;
                         var totalQuantity = ri.QuantityGrams * (decimal)portionsCount;
+                        var releasedQuantity = ri.Ingredient?.Category == IngredientCategory.CookedFood
+                            ? IngredientService.CalculateRequiredQuantityGrams(ri.Ingredient, totalQuantity)
+                            : (decimal?)null;
                         <tr>
                             <td class="ps-4 fw-semibold">@ri.Ingredient!.Name</td>
                             <td class="text-center fw-semibold">@FormatQuantity(perPortionQuantity) g</td>
                             <td class="text-center pe-4 fw-semibold">@FormatQuantity(totalQuantity) g</td>
+                            <td class="text-center pe-4 fw-semibold">
+                                @(releasedQuantity.HasValue ? $"{FormatQuantity(releasedQuantity.Value)} g" : "-")
+                            </td>
                         </tr>
                     }
                 </tbody>
@@ -90,6 +98,7 @@ else
                         <td class="ps-4 fw-bold">TOTAL REȚETĂ</td>
                         <td class="text-center fw-bold text-brown">@FormatQuantity(totalPerPortionQuantity) g</td>
                         <td class="text-center pe-4 fw-bold text-brown">@FormatQuantity(totalRecipeQuantity) g</td>
+                        <td class="text-center pe-4 fw-bold text-brown">@FormatQuantity(totalReleasedQuantity) g</td>
                     </tr>
                 </tfoot>
             </table>
@@ -103,8 +112,15 @@ else
 
     private Recipe? recipe;
     private int portionsCount = 1;
-    private decimal totalPerPortionQuantity => recipe?.RecipeIngredients.Sum(ri => ri.QuantityGrams) ?? 0;
-    private decimal totalRecipeQuantity => recipe?.RecipeIngredients.Sum(ri => ri.QuantityGrams * (decimal)portionsCount) ?? 0;
+    private decimal totalPerPortionQuantity => recipe?.RecipeIngredients
+        .Where(ri => ri.Ingredient?.Category != IngredientCategory.Vitamins)
+        .Sum(ri => ri.QuantityGrams) ?? 0;
+    private decimal totalRecipeQuantity => recipe?.RecipeIngredients
+        .Where(ri => ri.Ingredient?.Category != IngredientCategory.Vitamins)
+        .Sum(ri => ri.QuantityGrams * (decimal)portionsCount) ?? 0;
+    private decimal totalReleasedQuantity => recipe?.RecipeIngredients
+        .Where(ri => ri.Ingredient?.Category == IngredientCategory.CookedFood && ri.Ingredient != null)
+        .Sum(ri => IngredientService.CalculateRequiredQuantityGrams(ri.Ingredient!, ri.QuantityGrams * (decimal)portionsCount)) ?? 0;
 
     protected override async Task OnParametersSetAsync()
     {
