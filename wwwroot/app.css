@@ -987,12 +987,17 @@ h1, h2, h3, h4 {
     display: none;
 }
 
-@media print {
-    @page {
-        size: A4 landscape;
-        margin: 10mm;
-    }
+@page {
+    size: A4 portrait;
+    margin: 12mm;
+}
 
+@page nir-print {
+    size: A4 landscape;
+    margin: 10mm;
+}
+
+@media print {
     html,
     body {
         background: #fff !important;
@@ -1006,6 +1011,8 @@ h1, h2, h3, h4 {
         display: block !important;
         visibility: visible !important;
         position: relative;
+        page: nir-print;
+        break-before: page;
         width: 100%;
         color: #111;
         font-family: "Times New Roman", Times, serif;
@@ -1431,11 +1438,6 @@ h1, h2, h3, h4 {
 .recipe-preview-table tfoot td {
     border-top: 2px solid #d8c3a8;
     background: #fffaf3;
-}
-
-@page {
-    size: A4 portrait;
-    margin: 12mm;
 }
 
 @media print {
