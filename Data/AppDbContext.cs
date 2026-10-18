@@ -12,6 +12,9 @@ public class AppDbContext : DbContext
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
     public DbSet<Recipe> Recipes => Set<Recipe>();
     public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
+    public DbSet<AccountingDocument> AccountingDocuments => Set<AccountingDocument>();
+    public DbSet<AccountingDocumentLine> AccountingDocumentLines => Set<AccountingDocumentLine>();
+    public DbSet<AccountingDocumentAttachment> AccountingDocumentAttachments => Set<AccountingDocumentAttachment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -32,6 +35,28 @@ public class AppDbContext : DbContext
             .HasOne(ri => ri.Ingredient)
             .WithMany(i => i.RecipeIngredients)
             .HasForeignKey(ri => ri.IngredientId);
+
+        modelBuilder.Entity<AccountingDocumentLine>()
+            .HasOne(line => line.AccountingDocument)
+            .WithMany(document => document.Lines)
+            .HasForeignKey(line => line.AccountingDocumentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<AccountingDocumentLine>()
+            .HasOne(line => line.Ingredient)
+            .WithMany()
+            .HasForeignKey(line => line.IngredientId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<AccountingDocumentAttachment>()
+            .HasOne(attachment => attachment.AccountingDocument)
+            .WithMany(document => document.Attachments)
+            .HasForeignKey(attachment => attachment.AccountingDocumentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<AccountingDocumentAttachment>()
+            .Property(attachment => attachment.FileData)
+            .HasColumnType("varbinary(max)");
 
         // Self-referencing relationship for CookedFood referencing RawFood
         modelBuilder.Entity<Ingredient>()

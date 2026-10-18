@@ -1,0 +1,16 @@
+@page "/accounting/fiscal-receipt/edit/{Id:guid}"
+
+<DocumentRegister
+    DocumentType="DocumentType"
+    Title="@Title"
+    Subtitle="@Subtitle"
+    AddLabel="@AddLabel"
+    EditId="Id" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private const AccountingDocumentType DocumentType = AccountingDocumentType.FiscalReceipt;
+    private const string Title = "Bonuri fiscale";
+    private const string Subtitle = "Editează bonul fiscal și articolele sale.";
+    private const string AddLabel = "Bon fiscal nou";
+}

@@ -1,0 +1,103 @@
+@page "/accounting"
+@inject AccountingService AccountingService
+@rendermode InteractiveServer
+
+<div class="accounting-hero accounting-dashboard-hero mb-4">
+    <div>
+        <span class="eyebrow"><i class="bi bi-grid-1x2-fill me-2"></i>CENTRU FINANCIAR</span>
+        <h1>Contabilitate și gestiune</h1>
+        <p>Accesează rapid fiecare registru și urmărește activitatea firmei într-un singur loc.</p>
+    </div>
+    <div class="accounting-hero-status">
+        <span>DOCUMENTE ÎNREGISTRATE</span>
+        <strong>@totalDocuments</strong>
+        <i class="bi bi-calculator"></i>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <a class="accounting-section-card accounting-section-reception" href="/accounting/reception-notes">
+            <div class="accounting-card-top">
+                <span class="section-number">01</span>
+                <span class="accounting-card-icon"><i class="bi bi-file-earmark-text"></i></span>
+            </div>
+            <h2>Note de recepție</h2>
+            <p>Înregistrează NIR-urile și atașează facturile scanate, fotografiile sau PDF-urile aferente fiecărei recepții.</p>
+            <div class="accounting-card-footer">
+                <span class="accounting-count">@receptionNotesCount <small>@GetPlural(receptionNotesCount, "NIR", "NIR-uri")</small></span>
+                <span class="section-link">Deschide <i class="bi bi-arrow-up-right"></i></span>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6">
+        <a class="accounting-section-card accounting-section-warehouse" href="/accounting/warehouse">
+            <div class="accounting-card-top">
+                <span class="section-number">02</span>
+                <span class="accounting-card-icon"><i class="bi bi-box-seam"></i></span>
+            </div>
+            <h2>Magazie</h2>
+            <p>Registru pe ingredient, cu rânduri pentru NIR, BC și BF, intrări, ieșiri și sold curent.</p>
+            <div class="accounting-card-footer">
+                <span class="accounting-count">@warehouseIngredientsCount <small>@GetPlural(warehouseIngredientsCount, "ingredient", "ingrediente")</small></span>
+                <span class="section-link">Deschide <i class="bi bi-arrow-up-right"></i></span>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6">
+        <a class="accounting-section-card accounting-section-consumption" href="/accounting/consumption-notes">
+            <div class="accounting-card-top">
+                <span class="section-number">03</span>
+                <span class="accounting-card-icon"><i class="bi bi-box-arrow-up"></i></span>
+            </div>
+            <h2>Bonuri de consum</h2>
+            <p>Centralizează consumurile și scade automat cantitățile din fișa ingredientului din magazie.</p>
+            <div class="accounting-card-footer">
+                <span class="accounting-count">@consumptionNotesCount <small>@GetPlural(consumptionNotesCount, "bon", "bonuri")</small></span>
+                <span class="section-link">Deschide <i class="bi bi-arrow-up-right"></i></span>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-6">
+        <a class="accounting-section-card accounting-section-receipts" href="/accounting/fiscal-receipts">
+            <div class="accounting-card-top">
+                <span class="section-number">04</span>
+                <span class="accounting-card-icon"><i class="bi bi-receipt"></i></span>
+            </div>
+            <h2>Bonuri fiscale</h2>
+            <p>Înregistrează bonurile fiscale, articolele vândute, TVA-ul și totalurile zilnice.</p>
+            <div class="accounting-card-footer">
+                <span class="accounting-count">@fiscalReceiptsCount <small>@GetPlural(fiscalReceiptsCount, "bon", "bonuri")</small></span>
+                <span class="section-link">Deschide <i class="bi bi-arrow-up-right"></i></span>
+            </div>
+        </a>
+    </div>
+</div>
+
+@code {
+    private int receptionNotesCount;
+    private int warehouseIngredientsCount;
+    private int consumptionNotesCount;
+    private int fiscalReceiptsCount;
+
+    private int totalDocuments =>
+        receptionNotesCount + consumptionNotesCount + fiscalReceiptsCount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var receptionNotesTask = AccountingService.GetDocumentsAsync(AccountingDocumentType.ReceptionNote);
+        var consumptionNotesTask = AccountingService.GetDocumentsAsync(AccountingDocumentType.ConsumptionNote);
+        var fiscalReceiptsTask = AccountingService.GetDocumentsAsync(AccountingDocumentType.FiscalReceipt);
+        var ingredientsTask = AccountingService.GetIngredientsAsync();
+
+        await Task.WhenAll(receptionNotesTask, consumptionNotesTask, fiscalReceiptsTask, ingredientsTask);
+
+        receptionNotesCount = receptionNotesTask.Result.Count;
+        consumptionNotesCount = consumptionNotesTask.Result.Count;
+        fiscalReceiptsCount = fiscalReceiptsTask.Result.Count;
+        warehouseIngredientsCount = ingredientsTask.Result.Count;
+    }
+
+    private static string GetPlural(int count, string singular, string plural)
+        => count == 1 ? singular : plural;
+}

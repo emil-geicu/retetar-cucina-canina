@@ -1,0 +1,341 @@
+@using Microsoft.AspNetCore.Components.Forms
+@inject AccountingService AccountingService
+@inject IWebHostEnvironment Environment
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <a href="/accounting" class="back-link"><i class="bi bi-arrow-left"></i> Contabilitate</a>
+        <h1 class="mt-2">@Title</h1>
+        <p class="text-muted mb-0">@Subtitle</p>
+    </div>
+    <button class="btn btn-primary" @onclick="OpenForm"><i class="bi bi-plus-lg me-1"></i> @AddLabel</button>
+</div>
+
+<div class="register-toolbar mb-4">
+    <div class="register-search">
+        <i class="bi bi-search"></i>
+        <input type="search" class="form-control" placeholder="Caută după număr, furnizor sau articol..." @bind="searchTerm" @bind:event="oninput" />
+        @if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            <button type="button" class="register-search-clear" @onclick="ClearFilters" aria-label="Șterge căutarea"><i class="bi bi-x"></i></button>
+        }
+    </div>
+    <div class="register-filter">
+        <i class="bi bi-calendar3"></i>
+        <InputDate @bind-Value="dateFrom" class="form-control" aria-label="De la" />
+        <span>—</span>
+        <InputDate @bind-Value="dateTo" class="form-control" aria-label="Până la" />
+    </div>
+    <button type="button" class="btn btn-filter-reset" @onclick="ClearFilters"><i class="bi bi-arrow-counterclockwise me-1"></i> Resetează</button>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(errorMessage))
+{
+    <div class="alert alert-danger">@errorMessage</div>
+}
+
+@if (showForm)
+{
+    <div class="card accounting-form mb-4">
+        <h3>@(IsEditing ? $"Editează {Title.ToLowerInvariant()}" : (DocumentType == AccountingDocumentType.ReceptionNote ? "NIR nou" : AddLabel))</h3>
+        <EditForm Model="draft" OnValidSubmit="Save">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="alert alert-danger" />
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Număr document</label>
+                    <InputText @bind-Value="draft.Number" class="form-control" />
+                    <ValidationMessage For="@(() => draft.Number)" />
+                </div>
+                <div class="col-md-3"><label class="form-label">Data</label><InputDate @bind-Value="draft.DocumentDate" class="form-control" /></div>
+                <div class="col-md-3">
+                    <label class="form-label">Furnizor / beneficiar</label>
+                    <InputText @bind-Value="draft.PartnerName" class="form-control" />
+                    <ValidationMessage For="@(() => draft.PartnerName)" />
+                </div>
+                <div class="col-md-3"><label class="form-label">TVA (%)</label><InputNumber @bind-Value="draft.VatRate" class="form-control" step="0.01" min="0" /></div>
+            </div>
+
+            @if (DocumentType == AccountingDocumentType.ReceptionNote)
+            {
+                <div class="mt-3">
+                    <label class="form-label">Facturi și poze atașate</label>
+                    <InputFile OnChange="OnFilesSelected" multiple accept="image/*,.pdf" />
+                    <small class="text-muted d-block mt-1">Poți încărca fotografii HEIC/JPG/PNG sau PDF-uri. Maximum 10 MB / fișier.</small>
+                    @if (selectedFiles.Count > 0)
+                    {
+                        <div class="attachment-list mt-2">@foreach (var file in selectedFiles) { <span><i class="bi bi-paperclip"></i> @file.Name</span> }</div>
+                    }
+                </div>
+            }
+
+            <div class="accounting-line-editor mt-4">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label">Ingredient</label>
+                        <div class="ingredient-picker">
+                            <button type="button" class="ingredient-picker-toggle" @onclick="ToggleIngredientPicker">
+                                <i class="bi bi-search"></i>
+                                <span>@SelectedIngredientLabel</span>
+                                <i class="bi bi-chevron-down ingredient-picker-chevron"></i>
+                            </button>
+                            @if (ingredientPickerOpen)
+                            {
+                                <div class="ingredient-picker-menu">
+                                    <div class="ingredient-picker-search">
+                                        <i class="bi bi-search"></i>
+                                        <input type="search" class="form-control" placeholder="Caută ingredient..." @bind="ingredientSearch" @bind:event="oninput" @onclick:stopPropagation />
+                                        @if (!string.IsNullOrWhiteSpace(ingredientSearch))
+                                        {
+                                            <button type="button" @onclick="ClearIngredientSearch" aria-label="Șterge căutarea"><i class="bi bi-x"></i></button>
+                                        }
+                                    </div>
+                                    <div class="ingredient-picker-options">
+                                        @if (!FilteredIngredients.Any())
+                                        {
+                                            <div class="ingredient-picker-empty">Nu există ingrediente.</div>
+                                        }
+                                        else
+                                        {
+                                            @foreach (var ingredient in FilteredIngredients)
+                                            {
+                                                <button type="button" class="ingredient-picker-option @(selectedIngredientId == ingredient.Id.ToString() ? "selected" : string.Empty)" @onclick="() => SelectIngredient(ingredient)">
+                                                    <span>@ingredient.Name</span>
+                                                    @if (selectedIngredientId == ingredient.Id.ToString())
+                                                    {
+                                                        <i class="bi bi-check2"></i>
+                                                    }
+                                                </button>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                    <div class="col-md-3"><label class="form-label">Descriere</label><input class="form-control" @bind="lineDescription" /></div>
+                    <div class="col-md-2"><label class="form-label">Cantitate</label><input type="number" min="0.001" step="0.001" class="form-control" @bind="lineQuantity" /></div>
+                    <div class="col-md-2"><label class="form-label">Preț unitar</label><input type="number" min="0" step="0.01" class="form-control" @bind="lineUnitPrice" /></div>
+                    <div class="col-md-1"><button type="button" class="btn btn-secondary w-100" @onclick="AddLine"><i class="bi bi-plus"></i></button></div>
+                </div>
+            </div>
+            <div class="table-responsive mt-3">
+            <table class="table table-sm accounting-document-lines">
+                <thead><tr><th>Articol</th><th>Cantitate</th><th>Preț</th><th>Total</th><th></th></tr></thead>
+                <tbody>@foreach (var line in draft.Lines) { <tr><td>@line.Description</td><td>@line.Quantity.ToString("N3") kg</td><td>@line.UnitPrice.ToString("N2") lei</td><td>@line.Total.ToString("N2") lei</td><td><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => draft.Lines.Remove(line)"><i class="bi bi-trash"></i></button></td></tr> }</tbody>
+                <tfoot><tr><th colspan="3" class="text-end">Net:</th><th>@draft.NetTotal.ToString("N2") lei</th><th></th></tr><tr><th colspan="3" class="text-end">TVA (@draft.VatRate.ToString("N2")%):</th><th>@draft.VatAmount.ToString("N2") lei</th><th></th></tr><tr><th colspan="3" class="text-end">Total:</th><th>@draft.Total.ToString("N2") lei</th><th></th></tr></tfoot>
+            </table>
+            </div>
+            <div class="mt-3"><label class="form-label">Observații</label><InputTextArea @bind-Value="draft.Notes" class="form-control" rows="2" /></div>
+            <button type="submit" class="btn btn-primary mt-3" disabled="@saving">
+                @if (saving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    <span>Se salvează...</span>
+                }
+                else
+                {
+                    <span><i class="bi bi-check2 me-1"></i>Salvează</span>
+                }
+            </button>
+            <button type="button" class="btn btn-secondary mt-3 ms-2" @onclick="() => showForm = false">Anulează</button>
+        </EditForm>
+    </div>
+}
+
+<div class="card register-card">
+    <div class="register-card-header">
+        <div>
+            <h3 class="mb-1">Registru @Title.ToLowerInvariant()</h3>
+            <span class="text-muted small">@(FilteredDocuments.Count()) din @documents.Count documente afișate</span>
+        </div>
+        <span class="register-total"><strong>@FilteredDocuments.Count()</strong> rezultate</span>
+    </div>
+    @if (!FilteredDocuments.Any())
+    {
+        <div class="empty-state">
+            <i class="bi @(documents.Any() ? "bi-search" : "bi-journal-x")"></i>
+            <p>@(documents.Any() ? "Nu există documente care corespund filtrelor." : "Nu există documente înregistrate.")</p>
+            @if (documents.Any()) { <button type="button" class="btn btn-secondary btn-sm" @onclick="ClearFilters">Șterge filtrele</button> }
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive"><table class="table table-hover"><thead><tr><th>Data</th><th>Număr</th><th>Partener</th><th>Articole</th><th>TVA</th><th>Total</th><th>Atașamente</th><th></th></tr></thead><tbody>
+        @foreach (var document in FilteredDocuments)
+        {
+            <tr class="document-row" @onclick="() => OpenDetails(document.Id)">
+                <td><span class="document-date">@document.DocumentDate.ToString("dd.MM.yyyy")</span></td>
+                <td class="fw-bold"><a href="@GetDetailsUrl(document.Id)" @onclick:stopPropagation>@document.Number</a></td>
+                <td>@document.PartnerName</td>
+                <td>@document.Lines.Count</td>
+                <td>@document.VatRate.ToString("N2")%</td>
+                <td class="fw-bold">@document.Total.ToString("N2") lei</td>
+                <td>
+                    @if (document.Attachments.Count == 0)
+                    {
+                        <span class="text-muted">-</span>
+                    }
+                    else
+                    {
+                        <span class="attachment-count"><i class="bi bi-paperclip"></i> @document.Attachments.Count</span>
+                    }
+                </td>
+                <td class="text-nowrap">
+                    <button class="btn btn-sm btn-outline-primary me-1" title="Editează" @onclick:stopPropagation @onclick="() => EditDocument(document)"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" title="Șterge" @onclick:stopPropagation @onclick="() => Delete(document)"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>
+        }
+        </tbody></table></div>
+    }
+</div>
+
+@code {
+    [Parameter] public AccountingDocumentType DocumentType { get; set; }
+    [Parameter] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Subtitle { get; set; } = string.Empty;
+    [Parameter] public string AddLabel { get; set; } = "Document nou";
+    [Parameter] public Guid? EditId { get; set; }
+
+    private List<AccountingDocument> documents = new();
+    private List<Ingredient> ingredients = new();
+    private AccountingDocument draft = new();
+    private List<IBrowserFile> selectedFiles = new();
+    private string? errorMessage;
+    private bool showForm;
+    private bool saving;
+    private string selectedIngredientId = string.Empty;
+    private string lineDescription = string.Empty;
+    private decimal lineQuantity = 1;
+    private decimal lineUnitPrice;
+    private string ingredientSearch = string.Empty;
+    private bool ingredientPickerOpen;
+    private string searchTerm = string.Empty;
+    private DateTime? dateFrom;
+    private DateTime? dateTo;
+    private bool IsEditing => EditId.HasValue;
+
+    private IEnumerable<Ingredient> FilteredIngredients =>
+        ingredients.Where(ingredient =>
+            string.IsNullOrWhiteSpace(ingredientSearch)
+            || ingredient.Name.Contains(ingredientSearch, StringComparison.OrdinalIgnoreCase));
+
+    private string SelectedIngredientLabel =>
+        ingredients.FirstOrDefault(ingredient => ingredient.Id.ToString() == selectedIngredientId)?.Name
+        ?? $"Alege ingredientul ({FilteredIngredients.Count()})";
+
+    private IEnumerable<AccountingDocument> FilteredDocuments =>
+        documents
+            .Where(document => !dateFrom.HasValue || document.DocumentDate.Date >= dateFrom.Value.Date)
+            .Where(document => !dateTo.HasValue || document.DocumentDate.Date <= dateTo.Value.Date)
+            .Where(document =>
+                string.IsNullOrWhiteSpace(searchTerm)
+                || document.Number.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                || document.PartnerName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                || document.Lines.Any(line => line.Description.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                    || line.Ingredient?.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true));
+
+    protected override async Task OnInitializedAsync()
+    {
+        ingredients = await AccountingService.GetIngredientsAsync();
+        await Reload();
+
+        if (EditId.HasValue)
+        {
+            var existing = await AccountingService.GetDocumentByIdAsync(EditId.Value);
+            if (existing is null || existing.Type != DocumentType)
+            {
+                errorMessage = "Documentul nu a fost găsit.";
+                return;
+            }
+
+            draft = existing;
+            showForm = true;
+        }
+    }
+    private async Task Reload() => documents = await AccountingService.GetDocumentsAsync(DocumentType);
+    private void OpenForm() { errorMessage = null; draft = new AccountingDocument { Type = DocumentType, Number = $"AUTO-{DateTime.Now:yyyyMMdd-HHmm}", VatRate = 21m }; selectedFiles.Clear(); ingredientSearch = string.Empty; selectedIngredientId = string.Empty; ingredientPickerOpen = false; showForm = true; }
+    private void EditDocument(AccountingDocument document) => NavigationManager.NavigateTo(GetEditUrl(document));
+    private string GetEditUrl(AccountingDocument document) => document.Type switch
+    {
+        AccountingDocumentType.ReceptionNote => $"/accounting/document/edit/{document.Id}",
+        AccountingDocumentType.ConsumptionNote => $"/accounting/consumption-note/edit/{document.Id}",
+        AccountingDocumentType.FiscalReceipt => $"/accounting/fiscal-receipt/edit/{document.Id}",
+        _ => $"/accounting/document/edit/{document.Id}"
+    };
+    private void ClearIngredientSearch() => ingredientSearch = string.Empty;
+    private void ToggleIngredientPicker() => ingredientPickerOpen = !ingredientPickerOpen;
+    private void SelectIngredient(Ingredient ingredient)
+    {
+        selectedIngredientId = ingredient.Id.ToString();
+        ingredientSearch = string.Empty;
+        ingredientPickerOpen = false;
+    }
+    private void ClearFilters() { searchTerm = string.Empty; dateFrom = null; dateTo = null; }
+    private void OnFilesSelected(InputFileChangeEventArgs args) => selectedFiles = args.GetMultipleFiles(30).ToList();
+    private void AddLine()
+    {
+        if (lineQuantity <= 0) { errorMessage = "Cantitatea trebuie să fie mai mare decât zero."; return; }
+        var ingredient = ingredients.FirstOrDefault(item => item.Id.ToString() == selectedIngredientId);
+        draft.Lines.Add(new AccountingDocumentLine { IngredientId = ingredient?.Id, Ingredient = ingredient, Description = string.IsNullOrWhiteSpace(lineDescription) ? ingredient?.Name ?? "Articol" : lineDescription, Quantity = lineQuantity, UnitPrice = lineUnitPrice });
+        selectedIngredientId = string.Empty; lineDescription = string.Empty; lineQuantity = 1; lineUnitPrice = 0;
+    }
+    private async Task Save()
+    {
+        errorMessage = null;
+        saving = true;
+        try
+        {
+            if (draft.Lines.Count == 0)
+            {
+                errorMessage = "Adaugă cel puțin un articol înainte de salvare.";
+                return;
+            }
+
+            var uploadDirectory = Path.Combine(Environment.WebRootPath, "uploads", "invoices");
+            Directory.CreateDirectory(uploadDirectory);
+            foreach (var file in selectedFiles)
+            {
+                var storedName = $"{Guid.NewGuid():N}{Path.GetExtension(file.Name)}";
+                await using var memory = new MemoryStream();
+                await file.OpenReadStream(10 * 1024 * 1024).CopyToAsync(memory);
+                var fileData = memory.ToArray();
+
+                await using var stream = File.Create(Path.Combine(uploadDirectory, storedName));
+                await stream.WriteAsync(fileData);
+                draft.Attachments.Add(new AccountingDocumentAttachment
+                {
+                    OriginalFileName = file.Name,
+                    StoredFileName = storedName,
+                    ContentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType,
+                    FileData = fileData
+                });
+            }
+            if (IsEditing)
+            {
+                await AccountingService.UpdateDocumentAsync(draft);
+                NavigationManager.NavigateTo($"/accounting/document/{draft.Id}");
+            }
+            else
+            {
+                await AccountingService.AddDocumentAsync(draft);
+                showForm = false;
+                await Reload();
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or Microsoft.EntityFrameworkCore.DbUpdateException)
+        {
+            errorMessage = $"Documentul nu a putut fi salvat: {ex.GetBaseException().Message}";
+        }
+        finally
+        {
+            saving = false;
+        }
+    }
+    private async Task Delete(AccountingDocument document) { await AccountingService.DeleteDocumentAsync(document.Id); await Reload(); }
+    private string GetDetailsUrl(Guid id) => $"/accounting/document/{id}";
+    private void OpenDetails(Guid id) => NavigationManager.NavigateTo(GetDetailsUrl(id));
+}

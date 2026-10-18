@@ -1,0 +1,16 @@
+@page "/accounting/consumption-note/edit/{Id:guid}"
+
+<DocumentRegister
+    DocumentType="DocumentType"
+    Title="@Title"
+    Subtitle="@Subtitle"
+    AddLabel="@AddLabel"
+    EditId="Id" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private const AccountingDocumentType DocumentType = AccountingDocumentType.ConsumptionNote;
+    private const string Title = "Bonuri de consum";
+    private const string Subtitle = "Editează bonul de consum și articolele sale.";
+    private const string AddLabel = "Bon de consum nou";
+}

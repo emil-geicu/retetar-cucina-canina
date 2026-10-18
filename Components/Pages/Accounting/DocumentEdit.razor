@@ -1,0 +1,17 @@
+@page "/accounting/document/edit/{Id:guid}"
+
+<DocumentRegister
+    DocumentType="DocumentType"
+    Title="@Title"
+    Subtitle="@Subtitle"
+    AddLabel="@AddLabel"
+    EditId="Id" />
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private const AccountingDocumentType DocumentType = AccountingDocumentType.ReceptionNote;
+    private const string Title = "Note de recepție";
+    private const string Subtitle = "Editează documentul și păstrează atașamentele existente.";
+    private const string AddLabel = "NIR nou";
+}

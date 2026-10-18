@@ -1,0 +1,25 @@
+@page "/accounting/warehouse"
+@inject AccountingService AccountingService
+@rendermode InteractiveServer
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div><a href="/accounting" class="back-link"><i class="bi bi-arrow-left"></i> Contabilitate</a><h1 class="mt-2">Magazie</h1><p class="text-muted">Fișă analitică pentru fiecare ingredient: NIR, BC, BF, intrări, ieșiri și sold.</p></div>
+</div>
+<div class="card mb-4"><div class="row g-3"><div class="col-md-4"><label class="form-label">Caută ingredient</label><input class="form-control" @bind="search" @bind:event="oninput" /></div><div class="col-md-4"><div class="warehouse-summary"><span>Ingredientele urmărite</span><strong>@FilteredIngredients.Count()</strong></div></div></div></div>
+<div class="row g-3">
+@foreach (var ingredient in FilteredIngredients)
+{
+    var lines = documents.SelectMany(document => document.Lines.Where(line => line.IngredientId == ingredient.Id).Select(line => new { document, line })).ToList();
+    var entries = lines.Where(item => item.document.Type == AccountingDocumentType.ReceptionNote).Sum(item => item.line.Quantity);
+    var exits = lines.Where(item => item.document.Type is AccountingDocumentType.ConsumptionNote or AccountingDocumentType.FiscalReceipt).Sum(item => item.line.Quantity);
+    <div class="col-12"><div class="card warehouse-sheet"><div class="d-flex justify-content-between align-items-center"><div><h3>@ingredient.Name</h3><span class="text-muted">@ingredient.Category</span></div><div class="warehouse-balance"><small>SOLD</small><strong>@((entries - exits).ToString("N3")) kg</strong></div></div><div class="table-responsive mt-3"><table class="table table-sm mb-0"><thead><tr><th>Data</th><th>Document</th><th>Nr.</th><th>Intrare</th><th>Ieșire</th><th>Preț</th><th>Valoare</th></tr></thead><tbody>@foreach (var item in lines.OrderBy(item => item.document.DocumentDate)) { <tr><td>@item.document.DocumentDate.ToString("dd.MM.yyyy")</td><td>@GetTypeLabel(item.document.Type)</td><td>@item.document.Number</td><td>@(item.document.Type == AccountingDocumentType.ReceptionNote ? item.line.Quantity.ToString("N3") : "-")</td><td>@(item.document.Type is AccountingDocumentType.ConsumptionNote or AccountingDocumentType.FiscalReceipt ? item.line.Quantity.ToString("N3") : "-")</td><td>@item.line.UnitPrice.ToString("N2")</td><td>@item.line.Total.ToString("N2") lei</td></tr> }</tbody></table></div></div></div>
+}
+</div>
+@code {
+    private List<Ingredient> ingredients = new();
+    private List<AccountingDocument> documents = new();
+    private string search = string.Empty;
+    private IEnumerable<Ingredient> FilteredIngredients => ingredients.Where(i => string.IsNullOrWhiteSpace(search) || i.Name.Contains(search, StringComparison.OrdinalIgnoreCase));
+    protected override async Task OnInitializedAsync() { ingredients = await AccountingService.GetIngredientsAsync(); documents = await AccountingService.GetDocumentsAsync(); }
+    private static string GetTypeLabel(AccountingDocumentType type) => type switch { AccountingDocumentType.ReceptionNote => "NIR", AccountingDocumentType.ConsumptionNote => "BC", AccountingDocumentType.FiscalReceipt => "BF", _ => type.ToString() };
+}

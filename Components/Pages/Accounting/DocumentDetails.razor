@@ -1,0 +1,193 @@
+@page "/accounting/document/{Id:guid}"
+@inject AccountingService AccountingService
+@inject NavigationManager NavigationManager
+@inject IWebHostEnvironment Environment
+@rendermode InteractiveServer
+
+@if (document is null)
+{
+    <div class="empty-state">
+        <i class="bi bi-file-earmark-x"></i>
+        <p>Documentul nu a fost găsit.</p>
+        <button class="btn btn-secondary" @onclick="GoBack">Înapoi</button>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <button class="back-link back-button" @onclick="GoBack"><i class="bi bi-arrow-left"></i> Înapoi la registru</button>
+            <div class="d-flex align-items-center gap-3 mt-3">
+                <div class="document-details-icon"><i class="@GetDocumentIcon(document.Type)"></i></div>
+                <div>
+                    <span class="document-type-label">@GetTypeLabel(document.Type)</span>
+                    <h1 class="mb-1">Document @document.Number</h1>
+                    <p class="text-muted mb-0">@document.DocumentDate.ToString("dd MMMM yyyy") · @document.PartnerName</p>
+                </div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button class="btn btn-primary" @onclick="Edit"><i class="bi bi-pencil me-1"></i> Editează</button>
+            <span class="document-status-badge">Înregistrat</span>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card details-card">
+                <div class="details-card-header">
+                    <div>
+                        <h3>Articole document</h3>
+                        <span>@document.Lines.Count @(document.Lines.Count == 1 ? "articol" : "articole")</span>
+                    </div>
+                    <span class="details-number">@document.Number</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table details-lines-table">
+                        <thead><tr><th>Articol</th><th>Ingredient</th><th>Cantitate</th><th>Preț unitar</th><th>Total</th></tr></thead>
+                        <tbody>
+                            @foreach (var line in document.Lines)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@line.Description</td>
+                                    <td>@(line.Ingredient?.Name ?? "-")</td>
+                                    <td>@line.Quantity.ToString("N3") @line.Unit</td>
+                                    <td>@line.UnitPrice.ToString("N2") lei</td>
+                                    <td class="fw-semibold">@line.Total.ToString("N2") lei</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="details-totals">
+                    <div><span>Subtotal</span><strong>@document.NetTotal.ToString("N2") lei</strong></div>
+                    <div><span>TVA (@document.VatRate.ToString("N2")%)</span><strong>@document.VatAmount.ToString("N2") lei</strong></div>
+                    <div class="details-total-final"><span>Total document</span><strong>@document.Total.ToString("N2") lei</strong></div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(document.Notes))
+            {
+                <div class="card details-card">
+                    <h3>Observații</h3>
+                    <p class="details-notes">@document.Notes</p>
+                </div>
+            }
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card details-card mb-4">
+                <h3>Informații document</h3>
+                <dl class="details-meta">
+                    <dt>Tip</dt><dd>@GetTypeLabel(document.Type)</dd>
+                    <dt>Număr</dt><dd>@document.Number</dd>
+                    <dt>Data</dt><dd>@document.DocumentDate.ToString("dd.MM.yyyy")</dd>
+                    <dt>Furnizor / beneficiar</dt><dd>@document.PartnerName</dd>
+                    <dt>TVA</dt><dd>@document.VatRate.ToString("N2")%</dd>
+                </dl>
+            </div>
+
+            <div class="card details-card">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="mb-0">Documente atașate</h3>
+                    <span class="attachment-count">@document.Attachments.Count</span>
+                </div>
+                @if (document.Attachments.Count == 0)
+                {
+                    <div class="details-empty-attachments"><i class="bi bi-paperclip"></i><span>Nu există atașamente.</span></div>
+                }
+                else
+                {
+                    @foreach (var attachment in document.Attachments)
+                    {
+                        <div class="attachment-preview">
+                            @if (IsImage(attachment))
+                            {
+                                <button type="button" class="attachment-image-button" @onclick="() => OpenImage(attachment)">
+                                    <img src="@GetAttachmentSource(attachment)" alt="@attachment.OriginalFileName" />
+                                    <span class="attachment-expand-hint"><i class="bi bi-arrows-fullscreen"></i> Extinde imaginea</span>
+                                </button>
+                            }
+                            else if (IsPdf(attachment))
+                            {
+                                <iframe src="@GetAttachmentSource(attachment)" title="@attachment.OriginalFileName"></iframe>
+                            }
+                            else
+                            {
+                                <div class="attachment-unsupported"><i class="bi bi-file-earmark"></i></div>
+                            }
+                            <a class="attachment-preview-name" href="@GetAttachmentSource(attachment)" target="_blank">
+                                <i class="@GetAttachmentIcon(attachment)"></i> @attachment.OriginalFileName
+                            </a>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@if (expandedImage is not null)
+{
+    <div class="image-lightbox" role="dialog" aria-modal="true" aria-label="Previzualizare imagine" @onclick="CloseImage">
+        <div class="image-lightbox-toolbar" @onclick:stopPropagation>
+            <span>@expandedImage.OriginalFileName</span>
+            <div>
+                <button type="button" @onclick="ZoomOut" title="Micșorează"><i class="bi bi-dash-lg"></i></button>
+                <span>@Math.Round(imageZoom * 100)%</span>
+                <button type="button" @onclick="ZoomIn" title="Mărește"><i class="bi bi-plus-lg"></i></button>
+                <button type="button" @onclick="ResetZoom" title="Resetează zoom"><i class="bi bi-arrow-counterclockwise"></i></button>
+                <button type="button" @onclick="CloseImage" title="Închide"><i class="bi bi-x-lg"></i></button>
+            </div>
+        </div>
+        <div class="image-lightbox-stage" @onclick:stopPropagation>
+            <img src="@GetAttachmentSource(expandedImage)" alt="@expandedImage.OriginalFileName" style="@($"transform: scale({imageZoom.ToString(System.Globalization.CultureInfo.InvariantCulture)});")" />
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private AccountingDocument? document;
+    private AccountingDocumentAttachment? expandedImage;
+    private double imageZoom = 1;
+
+    protected override async Task OnParametersSetAsync()
+        => document = await AccountingService.GetDocumentByIdAsync(Id);
+
+    private void GoBack() => NavigationManager.NavigateTo("/accounting");
+    private void Edit() => NavigationManager.NavigateTo(GetEditUrl(document!.Type));
+    private void OpenImage(AccountingDocumentAttachment attachment)
+    {
+        expandedImage = attachment;
+        imageZoom = 1;
+    }
+    private void CloseImage() => expandedImage = null;
+    private void ZoomIn() => imageZoom = Math.Min(4, imageZoom + .25);
+    private void ZoomOut() => imageZoom = Math.Max(.5, imageZoom - .25);
+    private void ResetZoom() => imageZoom = 1;
+    private string GetEditUrl(AccountingDocumentType type) => type switch
+    {
+        AccountingDocumentType.ReceptionNote => $"/accounting/document/edit/{Id}",
+        AccountingDocumentType.ConsumptionNote => $"/accounting/consumption-note/edit/{Id}",
+        AccountingDocumentType.FiscalReceipt => $"/accounting/fiscal-receipt/edit/{Id}",
+        _ => $"/accounting/document/edit/{Id}"
+    };
+    private string GetAttachmentSource(AccountingDocumentAttachment attachment)
+    {
+        if (attachment.FileData is { Length: > 0 })
+        {
+            return $"data:{attachment.ContentType};base64,{Convert.ToBase64String(attachment.FileData)}";
+        }
+
+        var path = Path.Combine(Environment.WebRootPath, "uploads", "invoices", attachment.StoredFileName);
+        return File.Exists(path)
+            ? $"/uploads/invoices/{Uri.EscapeDataString(attachment.StoredFileName)}"
+            : "#";
+    }
+    private static bool IsPdf(AccountingDocumentAttachment attachment) => attachment.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) || Path.GetExtension(attachment.OriginalFileName).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
+    private static bool IsImage(AccountingDocumentAttachment attachment) => attachment.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif" }.Contains(Path.GetExtension(attachment.OriginalFileName), StringComparer.OrdinalIgnoreCase);
+    private static string GetAttachmentIcon(AccountingDocumentAttachment attachment) => IsPdf(attachment) ? "bi bi-file-earmark-pdf" : IsImage(attachment) ? "bi bi-file-earmark-image" : "bi bi-file-earmark";
+    private static string GetDocumentIcon(AccountingDocumentType type) => type switch { AccountingDocumentType.ReceptionNote => "bi bi-file-earmark-text", AccountingDocumentType.ConsumptionNote => "bi bi-box-arrow-up", AccountingDocumentType.FiscalReceipt => "bi bi-receipt", AccountingDocumentType.WarehouseMovement => "bi bi-box-seam", _ => "bi bi-file-earmark" };
+    private static string GetTypeLabel(AccountingDocumentType type) => type switch { AccountingDocumentType.Invoice => "Factură", AccountingDocumentType.ReceptionNote => "NIR", AccountingDocumentType.WarehouseMovement => "Mișcare magazie", AccountingDocumentType.ConsumptionNote => "Bon de consum", AccountingDocumentType.FiscalReceipt => "Bon fiscal", _ => type.ToString() };
+}
