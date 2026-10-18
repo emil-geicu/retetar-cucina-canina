@@ -347,6 +347,8 @@
     private DateTime? dateTo;
     private bool IsEditing => EditId.HasValue;
     private decimal CalculatedLineVat => linePurchaseUnitPrice * lineQuantity * lineVatRate / 100m;
+    private const string DefaultCommissionMember = "BLAGA CIPRIAN";
+    private const string DefaultWarehouseReceiver = "PĂTRU PATRICIA";
 
     private IEnumerable<Ingredient> FilteredIngredients =>
         ingredients.Where(ingredient =>
@@ -387,6 +389,14 @@
             {
                 draft.VehicleNumber = "DJ 22 BJB";
                 draft.DelegateName = "BLAGA CIPRIAN";
+                if (string.IsNullOrWhiteSpace(draft.CommissionMemberOne))
+                {
+                    draft.CommissionMemberOne = DefaultCommissionMember;
+                }
+                if (string.IsNullOrWhiteSpace(draft.WarehouseReceiverName))
+                {
+                    draft.WarehouseReceiverName = DefaultWarehouseReceiver;
+                }
             }
             if (DocumentType == AccountingDocumentType.ReceptionNote && string.IsNullOrWhiteSpace(draft.InvoiceNumber))
             {
@@ -397,7 +407,7 @@
         }
     }
     private async Task Reload() => documents = await AccountingService.GetDocumentsAsync(DocumentType);
-    private void OpenForm() { errorMessage = null; importMessage = null; draft = new AccountingDocument { Type = DocumentType, Number = string.Empty, VatRate = 11m, UnitName = DocumentType == AccountingDocumentType.ReceptionNote ? "BJB CATERING FOOD SRL" : string.Empty, VehicleNumber = DocumentType == AccountingDocumentType.ReceptionNote ? "DJ 22 BJB" : string.Empty, DelegateName = DocumentType == AccountingDocumentType.ReceptionNote ? "BLAGA CIPRIAN" : string.Empty }; selectedFiles.Clear(); ingredientSearch = string.Empty; selectedIngredientId = string.Empty; ingredientPickerOpen = false; ResetLineFields(); showForm = true; }
+    private void OpenForm() { errorMessage = null; importMessage = null; draft = new AccountingDocument { Type = DocumentType, Number = string.Empty, VatRate = 11m, UnitName = DocumentType == AccountingDocumentType.ReceptionNote ? "BJB CATERING FOOD SRL" : string.Empty, VehicleNumber = DocumentType == AccountingDocumentType.ReceptionNote ? "DJ 22 BJB" : string.Empty, DelegateName = DocumentType == AccountingDocumentType.ReceptionNote ? "BLAGA CIPRIAN" : string.Empty, CommissionMemberOne = DocumentType == AccountingDocumentType.ReceptionNote ? DefaultCommissionMember : string.Empty, WarehouseReceiverName = DocumentType == AccountingDocumentType.ReceptionNote ? DefaultWarehouseReceiver : string.Empty }; selectedFiles.Clear(); ingredientSearch = string.Empty; selectedIngredientId = string.Empty; ingredientPickerOpen = false; ResetLineFields(); showForm = true; }
     private void EditDocument(AccountingDocument document) => NavigationManager.NavigateTo(GetEditUrl(document));
     private string GetEditUrl(AccountingDocument document) => document.Type switch
     {
