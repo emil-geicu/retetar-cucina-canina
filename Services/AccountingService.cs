@@ -14,6 +14,7 @@ public class AccountingService(IDbContextFactory<AppDbContext> dbContextFactory)
             .Include(document => document.Lines)
             .ThenInclude(line => line.Ingredient)
             .Include(document => document.Attachments)
+            .AsSplitQuery()
             .AsNoTracking()
             .OrderByDescending(document => document.DocumentDate)
             .ThenByDescending(document => document.Number);
@@ -36,6 +37,7 @@ public class AccountingService(IDbContextFactory<AppDbContext> dbContextFactory)
             .Include(document => document.Lines)
             .ThenInclude(line => line.Ingredient)
             .Include(document => document.Attachments)
+            .AsSplitQuery()
             .AsNoTracking()
             .FirstOrDefaultAsync(document => document.Id == id);
     }
@@ -95,12 +97,13 @@ public class AccountingService(IDbContextFactory<AppDbContext> dbContextFactory)
         existing.Notes = document.Notes;
 
         context.AccountingDocumentLines.RemoveRange(existing.Lines);
-        await context.SaveChangesAsync();
-
         existing.Lines.Clear();
+        // Explicitly add replacements: their assigned GUIDs otherwise make EF
+        // treat entities discovered through a tracked collection as existing rows.
+        // Keep deletion and insertion in one SaveChanges transaction.
         foreach (var line in document.Lines)
         {
-            existing.Lines.Add(new AccountingDocumentLine
+            context.AccountingDocumentLines.Add(new AccountingDocumentLine
             {
                 Id = Guid.NewGuid(),
                 AccountingDocumentId = existing.Id,
@@ -121,7 +124,7 @@ public class AccountingService(IDbContextFactory<AppDbContext> dbContextFactory)
         foreach (var attachment in document.Attachments.Where(attachment =>
             !existing.Attachments.Any(existingAttachment => existingAttachment.Id == attachment.Id)))
         {
-            existing.Attachments.Add(new AccountingDocumentAttachment
+            context.AccountingDocumentAttachments.Add(new AccountingDocumentAttachment
             {
                 Id = attachment.Id == Guid.Empty ? Guid.NewGuid() : attachment.Id,
                 AccountingDocumentId = existing.Id,
