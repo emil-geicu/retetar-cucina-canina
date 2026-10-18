@@ -82,6 +82,15 @@ public class AccountingService(IDbContextFactory<AppDbContext> dbContextFactory)
         existing.DocumentDate = document.DocumentDate;
         existing.PartnerName = document.PartnerName;
         existing.Type = document.Type;
+        existing.UnitName = document.UnitName;
+        existing.AccompanyingDocumentNumber = document.AccompanyingDocumentNumber;
+        existing.InvoiceNumber = document.InvoiceNumber;
+        existing.ReceiptSource = document.ReceiptSource;
+        existing.VehicleNumber = document.VehicleNumber;
+        existing.AccompanyingDocuments = document.AccompanyingDocuments;
+        existing.DelegateName = document.DelegateName;
+        existing.CommissionMemberOne = document.CommissionMemberOne;
+        existing.WarehouseReceiverName = document.WarehouseReceiverName;
         existing.VatRate = document.VatRate;
         existing.Notes = document.Notes;
 
@@ -99,7 +108,13 @@ public class AccountingService(IDbContextFactory<AppDbContext> dbContextFactory)
                 Description = line.Description,
                 Unit = line.Unit,
                 Quantity = line.Quantity,
-                UnitPrice = line.UnitPrice
+                UnitPrice = line.UnitPrice,
+                PurchaseUnitPrice = line.PurchaseUnitPrice,
+                PurchaseValue = line.PurchaseValue,
+                SaleTotalValue = line.SaleTotalValue,
+                VatRate = line.VatRate,
+                VatPaidValue = line.VatPaidValue,
+                VatTotalValue = line.VatTotalValue
             });
         }
 

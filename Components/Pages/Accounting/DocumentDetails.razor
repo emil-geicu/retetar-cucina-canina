@@ -2,6 +2,7 @@
 @inject AccountingService AccountingService
 @inject NavigationManager NavigationManager
 @inject IWebHostEnvironment Environment
+@inject IJSRuntime JSRuntime
 @rendermode InteractiveServer
 
 @if (document is null)
@@ -14,7 +15,7 @@
 }
 else
 {
-    <div class="d-flex justify-content-between align-items-start mb-4">
+    <div class="screen-only d-flex justify-content-between align-items-start mb-4">
         <div>
             <button class="back-link back-button" @onclick="GoBack"><i class="bi bi-arrow-left"></i> Înapoi la registru</button>
             <div class="d-flex align-items-center gap-3 mt-3">
@@ -27,14 +28,18 @@ else
             </div>
         </div>
         <div class="d-flex align-items-center gap-2">
+            @if (document.Type == AccountingDocumentType.ReceptionNote)
+            {
+                <button class="btn btn-outline-primary" @onclick="PrintDocument"><i class="bi bi-printer me-1"></i> Printează NIR</button>
+            }
             <button class="btn btn-primary" @onclick="Edit"><i class="bi bi-pencil me-1"></i> Editează</button>
             <span class="document-status-badge">Înregistrat</span>
         </div>
     </div>
 
-    <div class="row g-4">
-        <div class="col-lg-8">
-            <div class="card details-card">
+    <div class="screen-only row g-4">
+        <div class="col-12">
+            <div class="card details-card details-articles-card">
                 <div class="details-card-header">
                     <div>
                         <h3>Articole document</h3>
@@ -44,16 +49,40 @@ else
                 </div>
                 <div class="table-responsive">
                     <table class="table details-lines-table">
-                        <thead><tr><th>Articol</th><th>Ingredient</th><th>Cantitate</th><th>Preț unitar</th><th>Total</th></tr></thead>
+                        <thead>
+                            <tr class="accounting-group-header">
+                                <th rowspan="2">Nr. crt.</th>
+                                <th rowspan="2">Material</th>
+                                <th rowspan="2">U/M</th>
+                                <th rowspan="2">Cantitate</th>
+                                <th colspan="2">Achiziție fără TVA</th>
+                                <th colspan="1">Vânzare</th>
+                                <th colspan="3">TVA</th>
+                            </tr>
+                            <tr class="accounting-column-header">
+                                <th>Preț unitar</th>
+                                <th>Valoare</th>
+                                <th>Valoare totală</th>
+                                <th>Cotă</th>
+                                <th>Plătită</th>
+                                <th>Totală</th>
+                            </tr>
+                        </thead>
                         <tbody>
-                            @foreach (var line in document.Lines)
+                            @foreach (var indexedLine in document.Lines.Select((line, index) => new { line, index }))
                             {
+                                var line = indexedLine.line;
                                 <tr>
-                                    <td class="fw-semibold">@line.Description</td>
-                                    <td>@(line.Ingredient?.Name ?? "-")</td>
-                                    <td>@line.Quantity.ToString("N3") @line.Unit</td>
-                                    <td>@line.UnitPrice.ToString("N2") lei</td>
-                                    <td class="fw-semibold">@line.Total.ToString("N2") lei</td>
+                                    <td class="accounting-row-number">@(indexedLine.index + 1)</td>
+                                    <td class="fw-semibold">@line.Description <small class="d-block text-muted">@(line.Ingredient?.Name ?? "-")</small></td>
+                                    <td>@line.Unit</td>
+                                    <td>@line.Quantity.ToString("N3")</td>
+                                    <td>@line.PurchaseUnitPrice.ToString("N2") lei</td>
+                                    <td>@line.PurchaseValue.ToString("N2") lei</td>
+                                    <td class="fw-semibold">@line.SaleTotalValue.ToString("N2") lei</td>
+                                    <td>@((line.VatRate == 0 ? document.VatRate : line.VatRate).ToString("N2"))%</td>
+                                    <td>@line.VatPaidValue.ToString("N2") lei</td>
+                                    <td>@line.VatTotalValue.ToString("N2") lei</td>
                                 </tr>
                             }
                         </tbody>
@@ -61,70 +90,180 @@ else
                 </div>
                 <div class="details-totals">
                     <div><span>Subtotal</span><strong>@document.NetTotal.ToString("N2") lei</strong></div>
-                    <div><span>TVA (@document.VatRate.ToString("N2")%)</span><strong>@document.VatAmount.ToString("N2") lei</strong></div>
+                    <div><span>TVA totală pe produse</span><strong>@document.VatAmount.ToString("N2") lei</strong></div>
                     <div class="details-total-final"><span>Total document</span><strong>@document.Total.ToString("N2") lei</strong></div>
                 </div>
             </div>
 
-            @if (!string.IsNullOrWhiteSpace(document.Notes))
-            {
-                <div class="card details-card">
-                    <h3>Observații</h3>
-                    <p class="details-notes">@document.Notes</p>
-                </div>
-            }
         </div>
 
         <div class="col-lg-4">
-            <div class="card details-card mb-4">
+            <div class="card details-card h-100">
                 <h3>Informații document</h3>
                 <dl class="details-meta">
                     <dt>Tip</dt><dd>@GetTypeLabel(document.Type)</dd>
                     <dt>Număr</dt><dd>@document.Number</dd>
                     <dt>Data</dt><dd>@document.DocumentDate.ToString("dd.MM.yyyy")</dd>
-                    <dt>Furnizor / beneficiar</dt><dd>@document.PartnerName</dd>
-                    <dt>TVA</dt><dd>@document.VatRate.ToString("N2")%</dd>
+                    <dt>Materiale furnizate de</dt><dd>@Display(document.PartnerName)</dd>
                 </dl>
             </div>
-
-            <div class="card details-card">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3 class="mb-0">Documente atașate</h3>
-                    <span class="attachment-count">@document.Attachments.Count</span>
-                </div>
-                @if (document.Attachments.Count == 0)
-                {
-                    <div class="details-empty-attachments"><i class="bi bi-paperclip"></i><span>Nu există atașamente.</span></div>
-                }
-                else
-                {
-                    @foreach (var attachment in document.Attachments)
-                    {
-                        <div class="attachment-preview">
-                            @if (IsImage(attachment))
-                            {
-                                <button type="button" class="attachment-image-button" @onclick="() => OpenImage(attachment)">
-                                    <img src="@GetAttachmentSource(attachment)" alt="@attachment.OriginalFileName" />
-                                    <span class="attachment-expand-hint"><i class="bi bi-arrows-fullscreen"></i> Extinde imaginea</span>
-                                </button>
-                            }
-                            else if (IsPdf(attachment))
-                            {
-                                <iframe src="@GetAttachmentSource(attachment)" title="@attachment.OriginalFileName"></iframe>
-                            }
-                            else
-                            {
-                                <div class="attachment-unsupported"><i class="bi bi-file-earmark"></i></div>
-                            }
-                            <a class="attachment-preview-name" href="@GetAttachmentSource(attachment)" target="_blank">
-                                <i class="@GetAttachmentIcon(attachment)"></i> @attachment.OriginalFileName
-                            </a>
-                        </div>
-                    }
-                }
-            </div>
         </div>
+
+        @if (document.Type == AccountingDocumentType.ReceptionNote)
+        {
+            <div class="col-lg-4">
+                <div class="card details-card h-100">
+                    <h3>Date NIR</h3>
+                    <dl class="details-meta">
+                        <dt>Unitatea</dt><dd>@Display(document.UnitName)</dd>
+                        <dt>Nr. factură</dt><dd>@Display(document.InvoiceNumber ?? document.AccompanyingDocumentNumber)</dd>
+                        <dt>Materiale furnizate de</dt><dd>@Display(document.PartnerName)</dd>
+                        <dt>Din</dt><dd>@Display(document.ReceiptSource)</dd>
+                        <dt>Documente însoțitoare</dt><dd>@Display(document.AccompanyingDocuments)</dd>
+                        <dt>Vagon / auto</dt><dd>@Display(document.VehicleNumber)</dd>
+                        <dt>Delegat</dt><dd>@Display(document.DelegateName)</dd>
+                    </dl>
+                </div>
+            </div>
+
+        }
+
+        <div class="col-lg-4">
+                <div class="card details-card h-100">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="mb-0">Documente atașate</h3>
+                        <span class="attachment-count">@document.Attachments.Count</span>
+                    </div>
+                    @if (document.Attachments.Count == 0)
+                    {
+                        <div class="details-empty-attachments"><i class="bi bi-paperclip"></i><span>Nu există atașamente.</span></div>
+                    }
+                    else
+                    {
+                        @foreach (var attachment in document.Attachments)
+                        {
+                            <div class="attachment-preview">
+                                @if (IsImage(attachment))
+                                {
+                                    <button type="button" class="attachment-image-button" @onclick="() => OpenImage(attachment)">
+                                        <img src="@GetAttachmentSource(attachment)" alt="@attachment.OriginalFileName" />
+                                        <span class="attachment-expand-hint"><i class="bi bi-arrows-fullscreen"></i> Extinde imaginea</span>
+                                    </button>
+                                }
+                                else if (IsPdf(attachment))
+                                {
+                                    <iframe src="@GetAttachmentSource(attachment)" title="@attachment.OriginalFileName"></iframe>
+                                }
+                                else
+                                {
+                                    <div class="attachment-unsupported"><i class="bi bi-file-earmark"></i></div>
+                                }
+                                <a class="attachment-preview-name" href="@GetAttachmentSource(attachment)" target="_blank">
+                                    <i class="@GetAttachmentIcon(attachment)"></i> @attachment.OriginalFileName
+                                </a>
+                            </div>
+
+                        }
+                    }
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(document.Notes))
+            {
+                <div class="col-lg-6">
+                    <div class="card details-card h-100">
+                        <h3>Observații</h3>
+                        <p class="details-notes">@document.Notes</p>
+                    </div>
+                </div>
+            }
+            @if (document.Type == AccountingDocumentType.ReceptionNote)
+            {
+                <div class="col-lg-6">
+                    <div class="card details-card h-100">
+                        <h3>Recepție și primire în gestiune</h3>
+                        <div class="details-signature-grid">
+                            <div><span>Membru comisie 1</span><strong>@Display(document.CommissionMemberOne)</strong></div>
+                            <div><span>Primit în gestiune de</span><strong>@Display(document.WarehouseReceiverName)</strong></div>
+                        </div>
+                    </div>
+                </div>
+            }
+
     </div>
+
+            @if (document.Type == AccountingDocumentType.ReceptionNote)
+            {
+                <section class="nir-print-sheet">
+                    <div class="nir-print-header">
+                        <div><strong>Unitatea</strong> @Display(document.UnitName)</div>
+                        <h1>NOTĂ DE RECEPȚIE ȘI CONSTATARE DIFERENȚE</h1>
+                        <div class="nir-print-meta">
+                            <span><strong>Nr. document:</strong> @document.Number</span>
+                            <span><strong>Data:</strong> @document.DocumentDate.ToString("dd.MM.yyyy")</span>
+                        </div>
+                    </div>
+                    <div class="nir-print-fields">
+                        <div><strong>Materiale furnizate de:</strong> @Display(document.PartnerName)</div>
+                        <div><strong>Din:</strong> @Display(document.ReceiptSource)</div>
+                        <div><strong>Vagon / auto nr.:</strong> @Display(document.VehicleNumber)</div>
+                        <div><strong>Documente însoțitoare:</strong> @Display(document.AccompanyingDocuments)</div>
+                        <div><strong>Delegat:</strong> @Display(document.DelegateName)</div>
+                    </div>
+                    <table class="nir-print-table">
+                        <thead>
+                            <tr>
+                                <th rowspan="2">Nr.<br />crt.</th>
+                                <th rowspan="2">Denumirea materialelor</th>
+                                <th rowspan="2">U/M</th>
+                                <th rowspan="2">Cant.</th>
+                                <th colspan="2">Achiziție fără T.V.A.</th>
+                                <th colspan="2">Vânzare</th>
+                                <th colspan="2">T.V.A.</th>
+                            </tr>
+                            <tr>
+                                <th>Preț unitar</th><th>Valoare</th>
+                                <th>Preț unitar</th><th>Valoare totală</th>
+                                <th>Plătită</th><th>Totală</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var indexedLine in document.Lines.Select((line, index) => new { line, index }))
+                            {
+                                <tr>
+                                    <td>@(indexedLine.index + 1)</td>
+                                    <td>@indexedLine.line.Description</td>
+                                    <td>@indexedLine.line.Unit</td>
+                                    <td>@indexedLine.line.Quantity.ToString("N3")</td>
+                                    <td>@indexedLine.line.PurchaseUnitPrice.ToString("N4")</td>
+                                    <td>@indexedLine.line.PurchaseValue.ToString("N2")</td>
+                                    <td>-</td>
+                                    <td>@indexedLine.line.SaleTotalValue.ToString("N2")</td>
+                                    <td>@indexedLine.line.VatPaidValue.ToString("N2")</td>
+                                    <td>@indexedLine.line.VatTotalValue.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr><th colspan="8">Total fără TVA</th><th colspan="2">@document.NetTotal.ToString("N2") lei</th></tr>
+                            <tr><th colspan="8">TVA totală</th><th colspan="2">@document.VatAmount.ToString("N2") lei</th></tr>
+                            <tr><th colspan="8">Total document</th><th colspan="2">@document.Total.ToString("N2") lei</th></tr>
+                        </tfoot>
+                    </table>
+                    <div class="nir-print-signatures">
+                        <div>
+                            <h3>COMISIA DE RECEPȚIE</h3>
+                            <div class="nir-print-signature-row"><span>Nume și prenume</span><strong>@Display(document.CommissionMemberOne)</strong><span>Semnătura</span></div>
+                            <div class="nir-print-signature-row"><span>Nume și prenume</span><strong></strong><span>Semnătura</span></div>
+                        </div>
+                        <div>
+                            <h3>PRIMIT ÎN GESTIUNE</h3>
+                            <div class="nir-print-signature-row"><span>Data</span><strong>@document.DocumentDate.ToString("dd.MM.yyyy")</strong></div>
+                            <div class="nir-print-signature-row"><span>Nume și prenume</span><strong>@Display(document.WarehouseReceiverName)</strong><span>Semnătura</span></div>
+                        </div>
+                    </div>
+                </section>
+            }
 }
 
 @if (expandedImage is not null)
@@ -157,6 +296,7 @@ else
 
     private void GoBack() => NavigationManager.NavigateTo("/accounting");
     private void Edit() => NavigationManager.NavigateTo(GetEditUrl(document!.Type));
+    private async Task PrintDocument() => await JSRuntime.InvokeVoidAsync("window.print");
     private void OpenImage(AccountingDocumentAttachment attachment)
     {
         expandedImage = attachment;
@@ -188,6 +328,7 @@ else
     private static bool IsPdf(AccountingDocumentAttachment attachment) => attachment.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase) || Path.GetExtension(attachment.OriginalFileName).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
     private static bool IsImage(AccountingDocumentAttachment attachment) => attachment.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase) || new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".heic", ".heif" }.Contains(Path.GetExtension(attachment.OriginalFileName), StringComparer.OrdinalIgnoreCase);
     private static string GetAttachmentIcon(AccountingDocumentAttachment attachment) => IsPdf(attachment) ? "bi bi-file-earmark-pdf" : IsImage(attachment) ? "bi bi-file-earmark-image" : "bi bi-file-earmark";
+    private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value;
     private static string GetDocumentIcon(AccountingDocumentType type) => type switch { AccountingDocumentType.ReceptionNote => "bi bi-file-earmark-text", AccountingDocumentType.ConsumptionNote => "bi bi-box-arrow-up", AccountingDocumentType.FiscalReceipt => "bi bi-receipt", AccountingDocumentType.WarehouseMovement => "bi bi-box-seam", _ => "bi bi-file-earmark" };
     private static string GetTypeLabel(AccountingDocumentType type) => type switch { AccountingDocumentType.Invoice => "Factură", AccountingDocumentType.ReceptionNote => "NIR", AccountingDocumentType.WarehouseMovement => "Mișcare magazie", AccountingDocumentType.ConsumptionNote => "Bon de consum", AccountingDocumentType.FiscalReceipt => "Bon fiscal", _ => type.ToString() };
 }

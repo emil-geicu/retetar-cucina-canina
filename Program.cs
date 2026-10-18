@@ -57,7 +57,20 @@ using (var scope = app.Services.CreateScope())
         IF COL_LENGTH('AccountingDocuments', 'VatRate') IS NULL
         BEGIN
             ALTER TABLE [AccountingDocuments] ADD [VatRate] decimal(18,4) NOT NULL
-                CONSTRAINT [DF_AccountingDocuments_VatRate] DEFAULT(21);
+                CONSTRAINT [DF_AccountingDocuments_VatRate] DEFAULT(11);
+        END
+
+        IF OBJECT_ID(N'[AccountingDocuments]', N'U') IS NOT NULL
+        BEGIN
+            IF COL_LENGTH('AccountingDocuments', 'UnitName') IS NULL ALTER TABLE [AccountingDocuments] ADD [UnitName] nvarchar(150) NULL;
+            IF COL_LENGTH('AccountingDocuments', 'AccompanyingDocumentNumber') IS NULL ALTER TABLE [AccountingDocuments] ADD [AccompanyingDocumentNumber] nvarchar(100) NULL;
+            IF COL_LENGTH('AccountingDocuments', 'InvoiceNumber') IS NULL ALTER TABLE [AccountingDocuments] ADD [InvoiceNumber] nvarchar(100) NULL;
+            IF COL_LENGTH('AccountingDocuments', 'ReceiptSource') IS NULL ALTER TABLE [AccountingDocuments] ADD [ReceiptSource] nvarchar(200) NULL;
+            IF COL_LENGTH('AccountingDocuments', 'VehicleNumber') IS NULL ALTER TABLE [AccountingDocuments] ADD [VehicleNumber] nvarchar(100) NULL;
+            IF COL_LENGTH('AccountingDocuments', 'AccompanyingDocuments') IS NULL ALTER TABLE [AccountingDocuments] ADD [AccompanyingDocuments] nvarchar(500) NULL;
+            IF COL_LENGTH('AccountingDocuments', 'DelegateName') IS NULL ALTER TABLE [AccountingDocuments] ADD [DelegateName] nvarchar(150) NULL;
+            IF COL_LENGTH('AccountingDocuments', 'CommissionMemberOne') IS NULL ALTER TABLE [AccountingDocuments] ADD [CommissionMemberOne] nvarchar(150) NULL;
+            IF COL_LENGTH('AccountingDocuments', 'WarehouseReceiverName') IS NULL ALTER TABLE [AccountingDocuments] ADD [WarehouseReceiverName] nvarchar(150) NULL;
         END
 
         IF OBJECT_ID(N'[AccountingDocumentLines]', N'U') IS NULL
@@ -70,6 +83,15 @@ using (var scope = app.Services.CreateScope())
                 [Unit] nvarchar(20) NOT NULL,
                 [Quantity] decimal(18,4) NOT NULL,
                 [UnitPrice] decimal(18,4) NOT NULL,
+                [PurchaseUnitPrice] decimal(18,4) NOT NULL DEFAULT(0),
+                [PurchaseValue] decimal(18,4) NOT NULL DEFAULT(0),
+                [CommercialMarkupUnitValue] decimal(18,4) NOT NULL DEFAULT(0),
+                [CommercialMarkupTotalValue] decimal(18,4) NOT NULL DEFAULT(0),
+                [SaleUnitPrice] decimal(18,4) NOT NULL DEFAULT(0),
+                [SaleTotalValue] decimal(18,4) NOT NULL DEFAULT(0),
+                [VatPaidValue] decimal(18,4) NOT NULL DEFAULT(0),
+                [VatTotalValue] decimal(18,4) NOT NULL DEFAULT(0),
+                [VatRate] decimal(18,4) NOT NULL DEFAULT(11),
                 CONSTRAINT [FK_AccountingDocumentLines_AccountingDocuments_AccountingDocumentId]
                     FOREIGN KEY ([AccountingDocumentId]) REFERENCES [AccountingDocuments]([Id]) ON DELETE CASCADE,
                 CONSTRAINT [FK_AccountingDocumentLines_Ingredients_IngredientId]
@@ -90,6 +112,16 @@ using (var scope = app.Services.CreateScope())
                 CONSTRAINT [FK_AccountingDocumentAttachments_AccountingDocuments_AccountingDocumentId]
                     FOREIGN KEY ([AccountingDocumentId]) REFERENCES [AccountingDocuments]([Id]) ON DELETE CASCADE
             );
+        END
+
+        IF OBJECT_ID(N'[AccountingDocumentLines]', N'U') IS NOT NULL
+        BEGIN
+            IF COL_LENGTH('AccountingDocumentLines', 'PurchaseUnitPrice') IS NULL ALTER TABLE [AccountingDocumentLines] ADD [PurchaseUnitPrice] decimal(18,4) NOT NULL CONSTRAINT [DF_Lines_PurchaseUnitPrice] DEFAULT(0);
+            IF COL_LENGTH('AccountingDocumentLines', 'PurchaseValue') IS NULL ALTER TABLE [AccountingDocumentLines] ADD [PurchaseValue] decimal(18,4) NOT NULL CONSTRAINT [DF_Lines_PurchaseValue] DEFAULT(0);
+            IF COL_LENGTH('AccountingDocumentLines', 'SaleTotalValue') IS NULL ALTER TABLE [AccountingDocumentLines] ADD [SaleTotalValue] decimal(18,4) NOT NULL CONSTRAINT [DF_Lines_SaleTotal] DEFAULT(0);
+            IF COL_LENGTH('AccountingDocumentLines', 'VatPaidValue') IS NULL ALTER TABLE [AccountingDocumentLines] ADD [VatPaidValue] decimal(18,4) NOT NULL CONSTRAINT [DF_Lines_VatPaid] DEFAULT(0);
+            IF COL_LENGTH('AccountingDocumentLines', 'VatTotalValue') IS NULL ALTER TABLE [AccountingDocumentLines] ADD [VatTotalValue] decimal(18,4) NOT NULL CONSTRAINT [DF_Lines_VatTotal] DEFAULT(0);
+            IF COL_LENGTH('AccountingDocumentLines', 'VatRate') IS NULL ALTER TABLE [AccountingDocumentLines] ADD [VatRate] decimal(18,4) NOT NULL CONSTRAINT [DF_Lines_VatRate] DEFAULT(11);
         END
 
         IF COL_LENGTH('AccountingDocumentAttachments', 'FileData') IS NULL

@@ -1,4 +1,6 @@
 @using Microsoft.AspNetCore.Components.Forms
+@using System.Globalization
+@using System.Text
 @inject AccountingService AccountingService
 @inject IWebHostEnvironment Environment
 @inject NavigationManager NavigationManager
@@ -38,28 +40,54 @@
 
 @if (showForm)
 {
-    <div class="card accounting-form mb-4">
-        <h3>@(IsEditing ? $"Editează {Title.ToLowerInvariant()}" : (DocumentType == AccountingDocumentType.ReceptionNote ? "NIR nou" : AddLabel))</h3>
+    <div class="accounting-form mb-4">
         <EditForm Model="draft" OnValidSubmit="Save">
+        <div class="form-section-card form-section-document">
+        <div class="form-section-heading">
+            <span class="form-section-icon"><i class="bi bi-file-earmark-text"></i></span>
+            <div><h3>@(IsEditing ? $"Editează {Title.ToLowerInvariant()}" : (DocumentType == AccountingDocumentType.ReceptionNote ? "NIR nou" : AddLabel))</h3><span>Datele principale ale documentului</span></div>
+        </div>
             <DataAnnotationsValidator />
             <ValidationSummary class="alert alert-danger" />
             <div class="row g-3">
-                <div class="col-md-3">
+                <div class="@(DocumentType == AccountingDocumentType.ReceptionNote ? "col-md-4" : "col-md-3")">
                     <label class="form-label">Număr document</label>
                     <InputText @bind-Value="draft.Number" class="form-control" />
                     <ValidationMessage For="@(() => draft.Number)" />
                 </div>
-                <div class="col-md-3"><label class="form-label">Data</label><InputDate @bind-Value="draft.DocumentDate" class="form-control" /></div>
-                <div class="col-md-3">
-                    <label class="form-label">Furnizor / beneficiar</label>
-                    <InputText @bind-Value="draft.PartnerName" class="form-control" />
-                    <ValidationMessage For="@(() => draft.PartnerName)" />
-                </div>
-                <div class="col-md-3"><label class="form-label">TVA (%)</label><InputNumber @bind-Value="draft.VatRate" class="form-control" step="0.01" min="0" /></div>
+                <div class="@(DocumentType == AccountingDocumentType.ReceptionNote ? "col-md-4" : "col-md-3")"><label class="form-label">Data</label><InputDate @bind-Value="draft.DocumentDate" class="form-control" /></div>
+                @if (DocumentType != AccountingDocumentType.ReceptionNote)
+                {
+                    <div class="col-md-3">
+                        <label class="form-label">Furnizor / beneficiar</label>
+                        <InputText @bind-Value="draft.PartnerName" class="form-control" />
+                        <ValidationMessage For="@(() => draft.PartnerName)" />
+                    </div>
+                }
+                @if (DocumentType != AccountingDocumentType.ReceptionNote)
+                {
+                    <div class="col-md-3"><label class="form-label">TVA (%)</label><InputNumber @bind-Value="draft.VatRate" class="form-control" step="0.01" min="0" /></div>
+                }
             </div>
+        </div>
 
             @if (DocumentType == AccountingDocumentType.ReceptionNote)
             {
+                <div class="form-section-card form-section-reception mt-4">
+                <div class="form-section-heading">
+                    <span class="form-section-icon"><i class="bi bi-card-list"></i></span>
+                    <div><h3>Date NIR și recepție</h3><span>Informații despre proveniență și documentele recepției</span></div>
+                </div>
+                <div class="nir-fields">
+                    <div class="row g-3">
+                        <div class="col-md-4"><label class="form-label">Unitatea</label><InputText @bind-Value="draft.UnitName" class="form-control" /></div>
+                        <div class="col-md-4"><label class="form-label">Materiale furnizate de</label><InputText @bind-Value="draft.PartnerName" class="form-control" /></div>
+                        <div class="col-md-4"><label class="form-label">Din</label><InputText @bind-Value="draft.ReceiptSource" class="form-control" /></div>
+                        <div class="col-md-3"><label class="form-label">Vagon / auto nr.</label><InputText @bind-Value="draft.VehicleNumber" class="form-control" /></div>
+                        <div class="col-md-6"><label class="form-label">Documente însoțitoare</label><InputText @bind-Value="draft.AccompanyingDocuments" class="form-control" /></div>
+                        <div class="col-md-6"><label class="form-label">Delegat</label><InputText @bind-Value="draft.DelegateName" class="form-control" /></div>
+                    </div>
+                </div>
                 <div class="mt-3">
                     <label class="form-label">Facturi și poze atașate</label>
                     <InputFile OnChange="OnFilesSelected" multiple accept="image/*,.pdf" />
@@ -69,9 +97,29 @@
                         <div class="attachment-list mt-2">@foreach (var file in selectedFiles) { <span><i class="bi bi-paperclip"></i> @file.Name</span> }</div>
                     }
                 </div>
+                </div>
             }
 
-            <div class="accounting-line-editor mt-4">
+            <div class="form-section-card form-section-ingredients mt-4">
+            <div class="form-section-heading">
+                <span class="form-section-icon"><i class="bi bi-basket2"></i></span>
+                <div><h3>Ingrediente și valori</h3><span>Adaugă materialele recepționate și valorile lor</span></div>
+            </div>
+            <div class="accounting-line-editor">
+                <div class="accounting-import-toolbar mb-3">
+                    <div>
+                        <strong>Importă rânduri din CSV</strong>
+                        <small class="d-block text-muted">Formatul NIR exportat cu separator „;” și zecimale cu virgulă este recunoscut automat.</small>
+                    </div>
+                    <label class="btn btn-outline-primary mb-0">
+                        <i class="bi bi-filetype-csv me-1"></i> Alege CSV
+                        <InputFile OnChange="ImportCsv" accept=".csv,text/csv" />
+                    </label>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(importMessage))
+                {
+                    <div class="alert @(importIsError ? "alert-danger" : "alert-success") py-2">@importMessage</div>
+                }
                 <div class="row g-2 align-items-end">
                     <div class="col-md-4">
                         <label class="form-label">Ingredient</label>
@@ -117,18 +165,94 @@
                     </div>
                     <div class="col-md-3"><label class="form-label">Descriere</label><input class="form-control" @bind="lineDescription" /></div>
                     <div class="col-md-2"><label class="form-label">Cantitate</label><input type="number" min="0.001" step="0.001" class="form-control" @bind="lineQuantity" /></div>
-                    <div class="col-md-2"><label class="form-label">Preț unitar</label><input type="number" min="0" step="0.01" class="form-control" @bind="lineUnitPrice" /></div>
+                    <div class="col-md-2"><label class="form-label">Preț unitar fără TVA</label><input type="number" min="0" step="0.01" class="form-control" @bind="linePurchaseUnitPrice" /></div>
                     <div class="col-md-1"><button type="button" class="btn btn-secondary w-100" @onclick="AddLine"><i class="bi bi-plus"></i></button></div>
                 </div>
+                @if (DocumentType == AccountingDocumentType.ReceptionNote)
+                {
+                    <div class="row g-2 mt-2">
+                        <div class="col-md-4"><label class="form-label">Valoare totală vânzare</label><input type="number" min="0" step="0.01" class="form-control" @bind="lineSaleTotalValue" /></div>
+                        <div class="col-md-4"><label class="form-label">TVA (%)</label><input type="number" min="0" step="0.01" class="form-control" @bind="lineVatRate" /></div>
+                    </div>
+                }
             </div>
             <div class="table-responsive mt-3">
             <table class="table table-sm accounting-document-lines">
-                <thead><tr><th>Articol</th><th>Cantitate</th><th>Preț</th><th>Total</th><th></th></tr></thead>
-                <tbody>@foreach (var line in draft.Lines) { <tr><td>@line.Description</td><td>@line.Quantity.ToString("N3") kg</td><td>@line.UnitPrice.ToString("N2") lei</td><td>@line.Total.ToString("N2") lei</td><td><button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => draft.Lines.Remove(line)"><i class="bi bi-trash"></i></button></td></tr> }</tbody>
-                <tfoot><tr><th colspan="3" class="text-end">Net:</th><th>@draft.NetTotal.ToString("N2") lei</th><th></th></tr><tr><th colspan="3" class="text-end">TVA (@draft.VatRate.ToString("N2")%):</th><th>@draft.VatAmount.ToString("N2") lei</th><th></th></tr><tr><th colspan="3" class="text-end">Total:</th><th>@draft.Total.ToString("N2") lei</th><th></th></tr></tfoot>
+                <thead>
+                    <tr class="accounting-group-header">
+                        <th rowspan="2">Nr. crt.</th>
+                        <th rowspan="2">Material</th>
+                        <th rowspan="2">U/M</th>
+                        <th rowspan="2">Cant.</th>
+                        <th colspan="2">Achiziție fără TVA</th>
+                        <th colspan="1">Vânzare</th>
+                        <th colspan="3">TVA</th>
+                        <th rowspan="2"></th>
+                    </tr>
+                    <tr class="accounting-column-header">
+                        <th>Preț unitar</th>
+                        <th>Valoare</th>
+                        <th>Valoare totală</th>
+                        <th>Cotă</th>
+                        <th>Plătită</th>
+                        <th>Totală</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var indexedLine in draft.Lines.Select((line, index) => new { line, index }))
+                    {
+                        <tr>
+                            <td class="accounting-row-number">@(indexedLine.index + 1)</td>
+                            <td><input class="form-control accounting-row-input" @bind="indexedLine.line.Description" /></td>
+                            <td><input class="form-control accounting-row-input accounting-row-unit" @bind="indexedLine.line.Unit" /></td>
+                            <td><input type="number" min="0.001" step="0.001" class="form-control accounting-row-input" @bind="indexedLine.line.Quantity" @bind:after="() => RecalculateLine(indexedLine.line)" /></td>
+                            <td><input type="number" min="0" step="0.0001" class="form-control accounting-row-input" @bind="indexedLine.line.PurchaseUnitPrice" @bind:after="() => RecalculateLine(indexedLine.line)" /></td>
+                            <td>@indexedLine.line.PurchaseValue.ToString("N2") lei</td>
+                            <td><input type="number" min="0" step="0.01" class="form-control accounting-row-input" @bind="indexedLine.line.SaleTotalValue" /></td>
+                            <td><input type="number" min="0" step="0.01" class="form-control accounting-row-input" @bind="indexedLine.line.VatRate" @bind:after="() => RecalculateLine(indexedLine.line)" /></td>
+                            <td>@indexedLine.line.VatPaidValue.ToString("N2") lei</td>
+                            <td>@indexedLine.line.VatTotalValue.ToString("N2") lei</td>
+                            <td class="accounting-actions-cell">
+                                <button type="button" class="accounting-delete-button" title="Șterge articolul" aria-label="Șterge articolul" @onclick="() => draft.Lines.Remove(indexedLine.line)">
+                                    <i class="bi bi-trash3"></i>
+                                    <span>Șterge</span>
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr><th colspan="9" class="text-end">Net:</th><th>@draft.NetTotal.ToString("N2") lei</th><th></th></tr>
+                    <tr><th colspan="9" class="text-end">TVA totală:</th><th>@draft.VatAmount.ToString("N2") lei</th><th></th></tr>
+                    <tr class="document-lines-grand-total"><th colspan="9" class="text-end">Total:</th><th>@draft.Total.ToString("N2") lei</th><th></th></tr>
+                </tfoot>
             </table>
             </div>
-            <div class="mt-3"><label class="form-label">Observații</label><InputTextArea @bind-Value="draft.Notes" class="form-control" rows="2" /></div>
+            </div>
+            <div class="form-section-card form-section-notes mt-4">
+                <div class="form-section-heading">
+                    <span class="form-section-icon"><i class="bi bi-chat-left-text"></i></span>
+                    <div><h3>Observații</h3><span>Note suplimentare despre document</span></div>
+                </div>
+                <InputTextArea @bind-Value="draft.Notes" class="form-control" rows="3" />
+            </div>
+            @if (DocumentType == AccountingDocumentType.ReceptionNote)
+            {
+                <div class="form-section-card form-section-commission mt-4">
+                    <div class="form-section-heading">
+                        <span class="form-section-icon"><i class="bi bi-pen"></i></span>
+                        <div><h3>Comisia de recepție</h3><span>Confirmarea recepției și primirea în gestiune</span></div>
+                    </div>
+                <div class="nir-fields">
+                    <div class="nir-fields-title"><i class="bi bi-pen"></i> Comisia de recepție și primirea în gestiune</div>
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Membru comisie</label><InputText @bind-Value="draft.CommissionMemberOne" class="form-control" /></div>
+                        <div class="col-md-6"><label class="form-label">Primit în gestiune de</label><InputText @bind-Value="draft.WarehouseReceiverName" class="form-control" /></div>
+                    </div>
+                </div>
+                </div>
+            }
+            <div class="form-actions">
             <button type="submit" class="btn btn-primary mt-3" disabled="@saving">
                 @if (saving)
                 {
@@ -141,6 +265,7 @@
                 }
             </button>
             <button type="button" class="btn btn-secondary mt-3 ms-2" @onclick="() => showForm = false">Anulează</button>
+            </div>
         </EditForm>
     </div>
 }
@@ -171,7 +296,7 @@
                 <td class="fw-bold"><a href="@GetDetailsUrl(document.Id)" @onclick:stopPropagation>@document.Number</a></td>
                 <td>@document.PartnerName</td>
                 <td>@document.Lines.Count</td>
-                <td>@document.VatRate.ToString("N2")%</td>
+                <td>@(document.Type == AccountingDocumentType.ReceptionNote ? "Pe produse" : $"{document.VatRate:N2}%")</td>
                 <td class="fw-bold">@document.Total.ToString("N2") lei</td>
                 <td>
                     @if (document.Attachments.Count == 0)
@@ -207,16 +332,21 @@
     private string? errorMessage;
     private bool showForm;
     private bool saving;
+    private string? importMessage;
+    private bool importIsError;
     private string selectedIngredientId = string.Empty;
     private string lineDescription = string.Empty;
     private decimal lineQuantity = 1;
-    private decimal lineUnitPrice;
+    private decimal linePurchaseUnitPrice;
+    private decimal lineSaleTotalValue;
+    private decimal lineVatRate = 11m;
     private string ingredientSearch = string.Empty;
     private bool ingredientPickerOpen;
     private string searchTerm = string.Empty;
     private DateTime? dateFrom;
     private DateTime? dateTo;
     private bool IsEditing => EditId.HasValue;
+    private decimal CalculatedLineVat => linePurchaseUnitPrice * lineQuantity * lineVatRate / 100m;
 
     private IEnumerable<Ingredient> FilteredIngredients =>
         ingredients.Where(ingredient =>
@@ -253,11 +383,21 @@
             }
 
             draft = existing;
+            if (DocumentType == AccountingDocumentType.ReceptionNote)
+            {
+                draft.VehicleNumber = "DJ 22 BJB";
+                draft.DelegateName = "BLAGA CIPRIAN";
+            }
+            if (DocumentType == AccountingDocumentType.ReceptionNote && string.IsNullOrWhiteSpace(draft.InvoiceNumber))
+            {
+                draft.InvoiceNumber = draft.AccompanyingDocumentNumber;
+                draft.AccompanyingDocumentNumber = null;
+            }
             showForm = true;
         }
     }
     private async Task Reload() => documents = await AccountingService.GetDocumentsAsync(DocumentType);
-    private void OpenForm() { errorMessage = null; draft = new AccountingDocument { Type = DocumentType, Number = $"AUTO-{DateTime.Now:yyyyMMdd-HHmm}", VatRate = 21m }; selectedFiles.Clear(); ingredientSearch = string.Empty; selectedIngredientId = string.Empty; ingredientPickerOpen = false; showForm = true; }
+    private void OpenForm() { errorMessage = null; importMessage = null; draft = new AccountingDocument { Type = DocumentType, Number = string.Empty, VatRate = 11m, UnitName = DocumentType == AccountingDocumentType.ReceptionNote ? "BJB CATERING FOOD SRL" : string.Empty, VehicleNumber = DocumentType == AccountingDocumentType.ReceptionNote ? "DJ 22 BJB" : string.Empty, DelegateName = DocumentType == AccountingDocumentType.ReceptionNote ? "BLAGA CIPRIAN" : string.Empty }; selectedFiles.Clear(); ingredientSearch = string.Empty; selectedIngredientId = string.Empty; ingredientPickerOpen = false; ResetLineFields(); showForm = true; }
     private void EditDocument(AccountingDocument document) => NavigationManager.NavigateTo(GetEditUrl(document));
     private string GetEditUrl(AccountingDocument document) => document.Type switch
     {
@@ -276,13 +416,214 @@
     }
     private void ClearFilters() { searchTerm = string.Empty; dateFrom = null; dateTo = null; }
     private void OnFilesSelected(InputFileChangeEventArgs args) => selectedFiles = args.GetMultipleFiles(30).ToList();
+    private async Task ImportCsv(InputFileChangeEventArgs args)
+    {
+        importMessage = null;
+        importIsError = false;
+
+        var file = args.File;
+        if (file is null || !file.Name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
+        {
+            importIsError = true;
+            importMessage = "Selectează un fișier CSV valid.";
+            return;
+        }
+
+        try
+        {
+            await using var stream = file.OpenReadStream(5 * 1024 * 1024);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            var content = await reader.ReadToEndAsync();
+            var importedLines = ParseCsvLines(content);
+
+            if (importedLines.Count == 0)
+            {
+                importIsError = true;
+                importMessage = "CSV-ul nu conține rânduri de produse recunoscute.";
+                return;
+            }
+
+            draft.Lines.Clear();
+            foreach (var line in importedLines)
+            {
+                draft.Lines.Add(line);
+            }
+
+            importMessage = $"Au fost importate {importedLines.Count} rânduri din „{file.Name}”. Verifică datele înainte de salvare.";
+        }
+        catch (Exception exception) when (exception is IOException or InvalidDataException or FormatException)
+        {
+            importIsError = true;
+            importMessage = $"Importul CSV a eșuat: {exception.Message}";
+        }
+    }
+
+    private static List<AccountingDocumentLine> ParseCsvLines(string content)
+    {
+        var rows = content
+            .Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(ParseCsvRow)
+            .Where(row => row.Count > 0)
+            .ToList();
+
+        if (rows.Count < 2)
+        {
+            return new List<AccountingDocumentLine>();
+        }
+
+        var headers = rows[0]
+            .Select(NormalizeCsvHeader)
+            .ToList();
+        var result = new List<AccountingDocumentLine>();
+
+        for (var rowIndex = 1; rowIndex < rows.Count; rowIndex++)
+        {
+            var row = rows[rowIndex];
+            if (row.Count == 0 || string.IsNullOrWhiteSpace(GetCsvValue(row, headers, "material")))
+            {
+                continue;
+            }
+
+            var quantity = ParseCsvDecimal(GetCsvValue(row, headers, "cant", "cantitate"));
+            var purchaseUnitPrice = ParseCsvDecimal(GetCsvValue(row, headers, "achizițiefărătvaprețunitar"));
+            var importedPurchaseValue = ParseCsvDecimal(GetCsvValue(row, headers, "achizițiefărătvavaloare"));
+            var purchaseValue = importedPurchaseValue > 0
+                ? importedPurchaseValue
+                : Math.Round(quantity * purchaseUnitPrice, 2, MidpointRounding.AwayFromZero);
+            var saleTotalValue = ParseCsvDecimal(GetCsvValue(row, headers, "vânzarevaloaretotală"));
+            var importedVatPaidValue = ParseCsvDecimal(GetCsvValue(row, headers, "tvaplatită"));
+            var importedVatTotalValue = ParseCsvDecimal(GetCsvValue(row, headers, "tvatotală"));
+            var vatTotalValue = importedVatTotalValue > 0
+                ? importedVatTotalValue
+                : Math.Round(purchaseValue + importedVatPaidValue, 2, MidpointRounding.AwayFromZero);
+            var vatPaidValue = importedVatTotalValue > 0
+                ? Math.Round(vatTotalValue - purchaseValue, 2, MidpointRounding.AwayFromZero)
+                : importedVatPaidValue;
+            var vatRate = purchaseValue > 0
+                ? Math.Round(vatPaidValue / purchaseValue * 100m, 2, MidpointRounding.AwayFromZero)
+                : 11m;
+
+            result.Add(new AccountingDocumentLine
+            {
+                Description = GetCsvValue(row, headers, "material"),
+                Unit = GetCsvValue(row, headers, "u/m", "um", "unitate"),
+                Quantity = quantity,
+                UnitPrice = purchaseUnitPrice,
+                PurchaseUnitPrice = purchaseUnitPrice,
+                PurchaseValue = purchaseValue,
+                SaleTotalValue = saleTotalValue,
+                VatRate = vatRate,
+                VatPaidValue = vatPaidValue,
+                VatTotalValue = vatTotalValue > 0 ? vatTotalValue : purchaseValue + vatPaidValue
+            });
+        }
+
+        return result;
+    }
+
+    private static string GetCsvValue(IReadOnlyList<string> row, IReadOnlyList<string> headers, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            var index = headers
+                .Select((header, headerIndex) => new { header, headerIndex })
+                .FirstOrDefault(item => item.header == NormalizeCsvHeader(name))?.headerIndex ?? -1;
+            if (index >= 0 && index < row.Count)
+            {
+                return row[index].Trim();
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static decimal ParseCsvDecimal(string value)
+    {
+        var normalized = value.Trim().Replace(" lei", string.Empty, StringComparison.OrdinalIgnoreCase).Replace(" ", string.Empty);
+        if (decimal.TryParse(normalized, NumberStyles.Number, CultureInfo.GetCultureInfo("ro-RO"), out var romanianValue))
+        {
+            return romanianValue;
+        }
+
+        return decimal.TryParse(normalized.Replace(',', '.'), NumberStyles.Number, CultureInfo.InvariantCulture, out var invariantValue)
+            ? invariantValue
+            : 0m;
+    }
+
+    private static List<string> ParseCsvRow(string line)
+    {
+        var values = new List<string>();
+        var current = new StringBuilder();
+        var quoted = false;
+
+        for (var index = 0; index < line.Length; index++)
+        {
+            var character = line[index];
+            if (character == '"')
+            {
+                if (quoted && index + 1 < line.Length && line[index + 1] == '"')
+                {
+                    current.Append('"');
+                    index++;
+                }
+                else
+                {
+                    quoted = !quoted;
+                }
+            }
+            else if (character == ';' && !quoted)
+            {
+                values.Add(current.ToString());
+                current.Clear();
+            }
+            else
+            {
+                current.Append(character);
+            }
+        }
+
+        values.Add(current.ToString());
+        return values;
+    }
+
+    private static string NormalizeCsvHeader(string value)
+    {
+        var normalized = value.Trim().Trim('\uFEFF').ToLowerInvariant();
+        var builder = new StringBuilder(normalized.Length);
+        foreach (var character in normalized)
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                builder.Append(character);
+            }
+        }
+
+        return builder.ToString();
+    }
     private void AddLine()
     {
         if (lineQuantity <= 0) { errorMessage = "Cantitatea trebuie să fie mai mare decât zero."; return; }
         var ingredient = ingredients.FirstOrDefault(item => item.Id.ToString() == selectedIngredientId);
-        draft.Lines.Add(new AccountingDocumentLine { IngredientId = ingredient?.Id, Ingredient = ingredient, Description = string.IsNullOrWhiteSpace(lineDescription) ? ingredient?.Name ?? "Articol" : lineDescription, Quantity = lineQuantity, UnitPrice = lineUnitPrice });
-        selectedIngredientId = string.Empty; lineDescription = string.Empty; lineQuantity = 1; lineUnitPrice = 0;
+        var purchaseValue = linePurchaseUnitPrice * lineQuantity;
+        var lineVat = purchaseValue * lineVatRate / 100m;
+        draft.Lines.Add(new AccountingDocumentLine
+        {
+            IngredientId = ingredient?.Id, Ingredient = ingredient,
+            Description = string.IsNullOrWhiteSpace(lineDescription) ? ingredient?.Name ?? "Articol" : lineDescription,
+            Quantity = lineQuantity, UnitPrice = linePurchaseUnitPrice,
+            PurchaseUnitPrice = linePurchaseUnitPrice, PurchaseValue = purchaseValue,
+            SaleTotalValue = lineSaleTotalValue,
+            VatRate = lineVatRate, VatPaidValue = lineVat, VatTotalValue = purchaseValue + lineVat
+        });
+        selectedIngredientId = string.Empty; ResetLineFields();
     }
+    private void RecalculateLine(AccountingDocumentLine line)
+    {
+        line.PurchaseValue = line.PurchaseUnitPrice * line.Quantity;
+        line.VatPaidValue = line.PurchaseValue * line.VatRate / 100m;
+        line.VatTotalValue = line.PurchaseValue + line.VatPaidValue;
+    }
+    private void ResetLineFields() { lineDescription = string.Empty; lineQuantity = 1; linePurchaseUnitPrice = 0; lineSaleTotalValue = 0; lineVatRate = 11m; }
     private async Task Save()
     {
         errorMessage = null;
@@ -293,6 +634,11 @@
             {
                 errorMessage = "Adaugă cel puțin un articol înainte de salvare.";
                 return;
+            }
+
+            foreach (var line in draft.Lines)
+            {
+                RecalculateLine(line);
             }
 
             var uploadDirectory = Path.Combine(Environment.WebRootPath, "uploads", "invoices");

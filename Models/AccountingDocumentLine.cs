@@ -20,4 +20,11 @@ public class AccountingDocumentLine
     public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal Total => Quantity * UnitPrice;
+
+    public decimal PurchaseUnitPrice { get; set; }
+    public decimal PurchaseValue { get; set; }
+    public decimal SaleTotalValue { get; set; }
+    public decimal VatRate { get; set; } = 11m;
+    public decimal VatPaidValue { get; set; }
+    public decimal VatTotalValue { get; set; }
 }

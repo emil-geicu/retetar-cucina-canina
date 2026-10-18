@@ -17,7 +17,26 @@ public class AccountingDocument
 
     public AccountingDocumentType Type { get; set; }
 
-    public decimal VatRate { get; set; } = 21m;
+    [StringLength(150)]
+    public string? UnitName { get; set; }
+    [StringLength(100)]
+    public string? AccompanyingDocumentNumber { get; set; }
+    [StringLength(100)]
+    public string? InvoiceNumber { get; set; }
+    [StringLength(200)]
+    public string? ReceiptSource { get; set; }
+    [StringLength(100)]
+    public string? VehicleNumber { get; set; }
+    [StringLength(500)]
+    public string? AccompanyingDocuments { get; set; }
+    [StringLength(150)]
+    public string? DelegateName { get; set; }
+    [StringLength(150)]
+    public string? CommissionMemberOne { get; set; }
+    [StringLength(150)]
+    public string? WarehouseReceiverName { get; set; }
+
+    public decimal VatRate { get; set; } = 11m;
 
     [StringLength(500)]
     public string? Notes { get; set; }
@@ -25,7 +44,7 @@ public class AccountingDocument
     public ICollection<AccountingDocumentLine> Lines { get; set; } = new List<AccountingDocumentLine>();
     public ICollection<AccountingDocumentAttachment> Attachments { get; set; } = new List<AccountingDocumentAttachment>();
 
-    public decimal NetTotal => Lines.Sum(line => line.Quantity * line.UnitPrice);
-    public decimal VatAmount => NetTotal * VatRate / 100m;
-    public decimal Total => NetTotal + VatAmount;
+    public decimal NetTotal => Lines.Sum(line => line.PurchaseValue);
+    public decimal VatAmount => Lines.Sum(line => line.VatPaidValue);
+    public decimal Total => Lines.Sum(line => line.VatTotalValue);
 }
